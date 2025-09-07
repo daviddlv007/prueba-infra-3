@@ -89,19 +89,33 @@ jobs:
       env:
         TF_CLI_ARGS: "-var-file=terraform.tfvars"
 
+    - name: Check and Unlock Stale Terraform Locks
+      run: |
+        cd ./infra/terraform/environments/dev
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        BUCKET_NAME="terraform-state-${ACCOUNT_ID}-dev"
+        TABLE_NAME="terraform-locks-${ACCOUNT_ID}"
+        PROJECT_NAME=$(basename $(git rev-parse --show-toplevel))
+        LOCK_ID=$(aws dynamodb get-item \
+          --table-name $TABLE_NAME \
+          --key "{\"LockID\": {\"S\": \"$BUCKET_NAME/$PROJECT_NAME/dev/terraform.tfstate\"}}" \
+          --query "Item.LockID.S" \
+          --output text 2>/dev/null || echo "")
+
+        if [ -n "$LOCK_ID" ] && [ "$LOCK_ID" != "None" ]; then
+          echo "⚠️ Found stale lock: $LOCK_ID, forcing unlock..."
+          terraform force-unlock -force $LOCK_ID
+        else
+          echo "✅ No stale locks found"
+        fi
+      working-directory: ./
+
     - name: Terraform Apply
       run: |
         cd ./infra/terraform/environments/dev
-        # Intentar apply con lock, si falla liberar lock y reintentar
-        if terraform apply -input=false -auto-approve -lock-timeout=10m tfplan; then
-          echo "✅ Apply completed successfully with locking"
-        else
-          echo "⚠️ Apply with locking failed, attempting to release stale lock..."
-          terraform force-unlock -force $(terraform show -json | jq -r '.values.backend.config.lock_id // empty') 2>/dev/null || true
-          echo "Retrying apply with lock disabled..."
-          terraform apply -input=false -auto-approve -lock=false tfplan
-        fi
+        terraform apply -input=false -auto-approve -lock-timeout=10m tfplan
       working-directory: ./
+
 
     - name: Generate Infrastructure Documentation
       run: |

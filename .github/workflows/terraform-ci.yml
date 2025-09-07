@@ -87,10 +87,32 @@ jobs:
         ./tfsec ./infra/terraform --soft-fail --exclude-downloaded-modules
       working-directory: ./
 
+    - name: Check and Unlock Stale Terraform Locks
+      run: |
+        cd ./infra/terraform/environments/dev
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        BUCKET_NAME="terraform-state-${ACCOUNT_ID}-dev"
+        TABLE_NAME="terraform-locks-${ACCOUNT_ID}"
+        PROJECT_NAME=$(basename $(git rev-parse --show-toplevel))
+        LOCK_ID=$(aws dynamodb get-item \
+          --table-name $TABLE_NAME \
+          --key "{\"LockID\": {\"S\": \"$BUCKET_NAME/$PROJECT_NAME/dev/terraform.tfstate\"}}" \
+          --query "Item.LockID.S" \
+          --output text 2>/dev/null || echo "")
+
+        if [ -n "$LOCK_ID" ] && [ "$LOCK_ID" != "None" ]; then
+          echo "⚠️ Found stale lock: $LOCK_ID, forcing unlock..."
+          terraform force-unlock -force $LOCK_ID
+        else
+          echo "✅ No stale locks found"
+        fi
+      working-directory: ./
+
+
     - name: Terraform Plan
       run: |
         cd ./infra/terraform/environments/dev
-        timeout 600 terraform plan -no-color -out=tfplan -lock=false
+        timeout 600 terraform plan -no-color -out=tfplan
       env:
         TF_CLI_ARGS: "-var-file=terraform.tfvars"
 
