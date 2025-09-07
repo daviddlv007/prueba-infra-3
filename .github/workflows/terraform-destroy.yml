@@ -1,8 +1,7 @@
-# .github/workflows/terraform-destroy.yml
 name: 'Terraform Destroy'
 
 on:
-  workflow_dispatch:  # Solo ejecución manual aprobada
+  workflow_dispatch:
     inputs:
       environment:
         description: 'Environment to destroy'
@@ -19,7 +18,7 @@ on:
         type: string
 
 env:
-  TF_VERSION: 1.8.2  # Versión óptima 2025
+  TF_VERSION: 1.8.2
   AWS_REGION: us-east-1
   DESTROY_TIMEOUT: 15m
 
@@ -33,7 +32,6 @@ jobs:
       contents: read
     timeout-minutes: 30
 
-    # Prevenir destrucción accidental
     if: ${{ github.event.inputs.confirm_destroy == 'DESTROY' }}
 
     steps:
@@ -72,7 +70,7 @@ jobs:
       run: |
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
         echo "TF_BACKEND_BUCKET=terraform-state-${ACCOUNT_ID}-${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-        echo "TF_BACKEND_KEY=${PROJECT_NAME}/${{ github.event.inputs.environment }}/terraform.tfstate" >> $GITHUB_ENV
+        echo "TF_BACKEND_KEY=$(basename $GITHUB_REPOSITORY)/${{ github.event.inputs.environment }}/terraform.tfstate" >> $GITHUB_ENV
         echo "TF_LOCK_TABLE=terraform-locks-${ACCOUNT_ID}" >> $GITHUB_ENV
 
     - name: Terraform Init
@@ -80,13 +78,13 @@ jobs:
         echo "Initializing Terraform for destruction..."
         cd ./infra/terraform/environments/${{ github.event.inputs.environment }}
         
+        # COMANDO CORREGIDO - backend-config separados
         terraform init -reconfigure -input=false \
           -backend-config="bucket=${{ env.TF_BACKEND_BUCKET }}" \
           -backend-config="key=${{ env.TF_BACKEND_KEY }}" \
           -backend-config="dynamodb_table=${{ env.TF_LOCK_TABLE }}" \
           -backend-config="region=${{ env.AWS_REGION }}" \
-          -backend-config="encrypt=true" \
-          -parallelism=10
+          -backend-config="encrypt=true"
         
         echo "✅ Terraform initialized for destruction"
       working-directory: ./
@@ -98,7 +96,6 @@ jobs:
         terraform state list
         echo "================================="
         
-        # Validar que el estado existe y tiene recursos
         RESOURCE_COUNT=$(terraform state list | wc -l)
         if [ "$RESOURCE_COUNT" -eq 0 ]; then
           echo "ℹ️ No resources found in state. Nothing to destroy."
@@ -113,7 +110,6 @@ jobs:
       run: |
         cd ./infra/terraform/environments/${{ github.event.inputs.environment }}
         
-        # Destroy eficiente con paralelismo y timeouts optimizados
         timeout ${{ env.DESTROY_TIMEOUT }} terraform destroy \
           -auto-approve \
           -input=false \
@@ -127,7 +123,7 @@ jobs:
     - name: Cleanup Empty State
       if: success() && env.SKIP_DESTROY == 'false'
       run: |
-        # Verificar si el estado está vacío y eliminar el archivo
+        # Verificar si el estado está vacío
         STATE_CONTENT=$(aws s3 cp s3://${{ env.TF_BACKEND_BUCKET }}/${{ env.TF_BACKEND_KEY }} - 2>/dev/null || echo "empty")
         
         if [ "$STATE_CONTENT" = "empty" ] || echo "$STATE_CONTENT" | grep -q "\"resources\": \[\]"; then
@@ -159,17 +155,8 @@ jobs:
         name: destruction-report-${{ github.event.inputs.environment }}
         path: destroy-report.md
 
-    - name: Notify on Failure
+    - name: Simple Failure Notification
       if: failure()
       run: |
-        echo "❌ Terraform destroy failed for environment ${{ github.event.inputs.environment }}"
-        echo "Check the workflow run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        
-        # Solo comentar si es un PR, no en ejecuciones manuales
-        if [ -n "${{ github.event.pull_request.number }}" ]; then
-          curl -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-            -d "{\"body\":\"❌ Terraform destroy failed for environment ${{ github.event.inputs.environment }}. Check the workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
-        fi
+        echo "::error::Terraform destroy failed for environment ${{ github.event.inputs.environment }}"
+        echo "::warning::Check details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
