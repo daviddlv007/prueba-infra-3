@@ -46,45 +46,48 @@ jobs:
 
     - name: Setup Terraform Backend (if needed)
       run: |
+        echo "Setting up backend resources if needed..."
         chmod +x ./infra/terraform/scripts/check-backend.sh
         chmod +x ./infra/terraform/scripts/setup-backend.sh
-        export ENVIRONMENT=dev
-        export PROJECT_NAME=${{ env.PROJECT_NAME }}
+        
+        # Usar valores directamente
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
         if ! ./infra/terraform/scripts/check-backend.sh; then
           echo "Creating backend resources..."
           ./infra/terraform/scripts/setup-backend.sh
+        else
+          echo "Backend resources already exist"
         fi
+      working-directory: ./
 
     - name: Terraform Init
       run: |
-        echo "Initializing backend with dynamic configuration..."
-        chmod +x ./infra/terraform/scripts/init-backend.sh
-        ./infra/terraform/scripts/init-backend.sh
-      working-directory: ./
-
-    - name: Verify Terraform Initialization
-      run: |
-        echo "=== Verifying Terraform initialization ==="
+        echo "Initializing Terraform with dynamic backend..."
         cd ./infra/terraform/environments/dev
         
-        # Verificar que el backend está inicializado
-        if [ -d ".terraform" ]; then
-            echo "✅ .terraform directory exists"
-            ls -la .terraform/
-        else
-            echo "❌ .terraform directory missing - init failed"
-            exit 1
-        fi
+        # Obtener valores dinámicamente
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        PROJECT_NAME=$(basename $(git rev-parse --show-toplevel))
+        ENVIRONMENT="dev"
         
-        # Verificar modules
-        echo "=== Modules ==="
-        terraform get
+        echo "Initializing for:"
+        echo "Project: $PROJECT_NAME"
+        echo "Account: $ACCOUNT_ID"
+        echo "Environment: $ENVIRONMENT"
         
-        # Verificar providers
-        echo "=== Providers ==="
-        terraform providers
+        # Inicializar Terraform completamente
+        terraform init -reconfigure -input=false \
+          -backend-config="bucket=terraform-state-${ACCOUNT_ID}-${ENVIRONMENT}" \
+          -backend-config="key=${PROJECT_NAME}/${ENVIRONMENT}/terraform.tfstate" \
+          -backend-config="dynamodb_table=terraform-locks-${ACCOUNT_ID}" \
+          -backend-config="region=us-east-1" \
+          -backend-config="encrypt=true"
         
-        echo "=== Initialization verification complete ==="
+        # Forzar instalación de módulos y providers
+        terraform get -update
+        
+        echo "✅ Terraform initialization completed successfully!"
+        ls -la .terraform/
       working-directory: ./
 
     - name: Terraform Validate
@@ -119,4 +122,3 @@ jobs:
       with:
         name: deployment-report
         path: deployment-status.md
-        if-no-files-found: ignore

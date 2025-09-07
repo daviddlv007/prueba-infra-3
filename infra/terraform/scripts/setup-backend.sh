@@ -1,33 +1,30 @@
 #!/bin/bash
 set -e
 
-# Configuración dinámica basada en variables de entorno
+# Obtener valores directamente
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=${AWS_REGION:-us-east-1}
-ENVIRONMENT=${ENVIRONMENT:-dev}
-PROJECT_NAME=${PROJECT_NAME:-$(basename $(git rev-parse --show-toplevel))}
-
-BUCKET_NAME="terraform-state-${ACCOUNT_ID}-${ENVIRONMENT}"
+BUCKET_NAME="terraform-state-${ACCOUNT_ID}-dev"
 TABLE_NAME="terraform-locks-${ACCOUNT_ID}"
 
-echo "Setting up Terraform backend for ${PROJECT_NAME} (${ENVIRONMENT})..."
+echo "Setting up Terraform backend..."
 echo "Account ID: ${ACCOUNT_ID}"
-echo "Region: ${REGION}"
+echo "S3 Bucket: ${BUCKET_NAME}"
+echo "DynamoDB Table: ${TABLE_NAME}"
 
 # Create S3 bucket
 if ! aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
   echo "Creating S3 bucket: ${BUCKET_NAME}"
   
   # us-east-1 requiere un tratamiento especial
-  if [ "$REGION" = "us-east-1" ]; then
+  if [ "$AWS_REGION" = "us-east-1" ] || [ -z "$AWS_REGION" ]; then
     aws s3api create-bucket \
       --bucket "${BUCKET_NAME}" \
-      --region "${REGION}"
+      --region us-east-1
   else
     aws s3api create-bucket \
       --bucket "${BUCKET_NAME}" \
-      --region "${REGION}" \
-      --create-bucket-configuration LocationConstraint="${REGION}"
+      --region "${AWS_REGION}" \
+      --create-bucket-configuration LocationConstraint="${AWS_REGION}"
   fi
   
   aws s3api put-bucket-versioning \
@@ -44,9 +41,9 @@ if ! aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
       }]
     }'
   
-  echo "S3 bucket created successfully: ${BUCKET_NAME}"
+  echo "✅ S3 bucket created successfully: ${BUCKET_NAME}"
 else
-  echo "S3 bucket already exists: ${BUCKET_NAME}"
+  echo "✅ S3 bucket already exists: ${BUCKET_NAME}"
 fi
 
 # Create DynamoDB table
@@ -57,13 +54,13 @@ if ! aws dynamodb describe-table --table-name "${TABLE_NAME}" 2>/dev/null; then
     --attribute-definitions AttributeName=LockID,AttributeType=S \
     --key-schema AttributeName=LockID,KeyType=HASH \
     --billing-mode PAY_PER_REQUEST \
-    --region "${REGION}"
+    --region us-east-1
   
-  echo "DynamoDB table created successfully: ${TABLE_NAME}"
+  echo "✅ DynamoDB table created successfully: ${TABLE_NAME}"
 else
-  echo "DynamoDB table already exists: ${TABLE_NAME}"
+  echo "✅ DynamoDB table already exists: ${TABLE_NAME}"
 fi
 
-echo "Backend setup complete!"
+echo "🎉 Backend setup complete!"
 echo "S3 Bucket: ${BUCKET_NAME}"
 echo "DynamoDB Table: ${TABLE_NAME}"
