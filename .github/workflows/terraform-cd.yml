@@ -101,9 +101,9 @@ jobs:
         TF_CLI_ARGS: "-var-file=terraform.tfvars"
 
     - name: Terraform Apply
-      run: terraform apply -input=false -auto-approve tfplan
+      run: terraform apply -input=false -auto-approve -lock=false tfplan
       working-directory: ./infra/terraform/environments/dev
-
+    
     - name: Generate Infrastructure Documentation
       run: |
         terraform output -json > infrastructure.json
