@@ -20,6 +20,6 @@ resource "aws_instance" "main" {
   })
 
   lifecycle {
-    ignore_changes = [ami_id]
+    ignore_changes = [ami]
   }
 }
