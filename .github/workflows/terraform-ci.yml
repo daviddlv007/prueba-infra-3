@@ -58,10 +58,10 @@ jobs:
           ./infra/terraform/scripts/init-backend.sh
         else
           echo "Initializing existing backend..."
-          terraform init
+          terraform init -input=false
         fi
-      working-directory: ./infra/terraform/environments/dev
-
+      working-directory: ./
+      
     - name: Terraform Validate
       run: terraform validate
       working-directory: ./infra/terraform/environments/dev
