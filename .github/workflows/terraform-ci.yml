@@ -62,22 +62,29 @@ jobs:
         fi
       working-directory: ./
 
-    - name: Verify Modules Installation
+    - name: Verify Terraform Initialization
       run: |
-        echo "=== Verifying modules installation ==="
+        echo "=== Verifying Terraform initialization ==="
         cd ./infra/terraform/environments/dev
+        
+        # Verificar que el backend está inicializado
+        if [ -d ".terraform" ]; then
+            echo "✅ .terraform directory exists"
+            ls -la .terraform/
+        else
+            echo "❌ .terraform directory missing - init failed"
+            exit 1
+        fi
+        
+        # Verificar modules
+        echo "=== Modules ==="
         terraform get
-        echo "=== Installed modules ==="
-        find .terraform/modules -type d -name "*" | head -10
-        echo "=== Modules verification complete ==="
-      working-directory: ./
-
-    - name: Verify Providers Installation
-      run: |
-        echo "=== Verifying providers installation ==="
-        cd ./infra/terraform/environments/dev
+        
+        # Verificar providers
+        echo "=== Providers ==="
         terraform providers
-        echo "=== Providers verification complete ==="
+        
+        echo "=== Initialization verification complete ==="
       working-directory: ./
 
     - name: Terraform Validate

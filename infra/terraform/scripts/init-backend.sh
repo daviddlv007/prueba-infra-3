@@ -2,6 +2,7 @@
 set -e
 
 echo "=== Starting Terraform Initialization ==="
+echo "Current directory: $(pwd)"
 
 # Obtener valores dinámicamente
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -12,14 +13,16 @@ echo "Project: ${PROJECT_NAME}"
 echo "Environment: ${ENVIRONMENT}"
 echo "Account ID: ${ACCOUNT_ID}"
 
-# Cambiar al directorio de Terraform
+# Cambiar al directorio de Terraform - CORREGIR RUTA
 echo "Changing to Terraform directory..."
 cd ./infra/terraform/environments/dev
-echo "Current directory: $(pwd)"
+echo "Now in directory: $(pwd)"
 
 # Verificar que estamos en el directorio correcto
 if [ ! -f "main.tf" ]; then
     echo "❌ ERROR: main.tf not found in current directory!"
+    echo "Directory contents:"
+    ls -la
     exit 1
 fi
 
@@ -36,7 +39,7 @@ terraform init -reconfigure -input=false \
 echo "Installing modules..."
 terraform get -update
 
-# Forzar la instalación de providers (nuevo paso crítico)
+# Forzar la instalación de providers
 echo "Ensuring providers are installed..."
 terraform init -upgrade
 
