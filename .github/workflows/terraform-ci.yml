@@ -67,7 +67,7 @@ jobs:
       working-directory: ./infra/terraform/environments/dev
 
     - name: Terraform Security Scan
-      uses: aquasecurity/tfsec@v1.32.2
+      uses: aquasecurity/tfsec@v1.28.4
       with:
         directory: ./infra/terraform
 
