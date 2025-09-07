@@ -51,6 +51,6 @@ jobs:
       
     - name: Check for drift
       run: |
-        terraform plan -detailed-exitcode -lock-timeout=5m
+        terraform plan -detailed-exitcode  -lock=false
       working-directory: ./infra/terraform/environments/dev
       continue-on-error: true

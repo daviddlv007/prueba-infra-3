@@ -90,7 +90,7 @@ jobs:
     - name: Terraform Plan
       run: |
         cd ./infra/terraform/environments/dev
-        timeout 600 terraform plan -no-color -out=tfplan -lock-timeout=5m
+        timeout 600 terraform plan -no-color -out=tfplan -lock=false
       env:
         TF_CLI_ARGS: "-var-file=terraform.tfvars"
 
