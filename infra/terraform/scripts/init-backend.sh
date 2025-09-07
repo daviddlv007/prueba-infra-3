@@ -38,7 +38,9 @@ terraform get -update
 
 # Verificar que los módulos se instalaron
 echo "Verifying modules installation..."
-terraform list
+terraform get
+echo "✅ Modules installed successfully:"
+find .terraform/modules -type d -name "*" | head -10
 
 echo "✅ Terraform backend initialized successfully!"
 echo "✅ All modules installed successfully!"

@@ -67,7 +67,8 @@ jobs:
         echo "=== Verifying modules installation ==="
         cd ./infra/terraform/environments/dev
         terraform get
-        terraform list
+        echo "=== Installed modules ==="
+        find .terraform/modules -type d -name "*" | head -10
         echo "=== Modules verification complete ==="
       working-directory: ./
 
