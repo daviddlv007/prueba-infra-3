@@ -72,6 +72,14 @@ jobs:
         echo "=== Modules verification complete ==="
       working-directory: ./
 
+    - name: Verify Providers Installation
+      run: |
+        echo "=== Verifying providers installation ==="
+        cd ./infra/terraform/environments/dev
+        terraform providers
+        echo "=== Providers verification complete ==="
+      working-directory: ./
+
     - name: Terraform Validate
       run: terraform validate
       working-directory: ./infra/terraform/environments/dev

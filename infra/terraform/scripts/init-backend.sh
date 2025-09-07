@@ -36,11 +36,15 @@ terraform init -reconfigure -input=false \
 echo "Installing modules..."
 terraform get -update
 
-# Verificar que los módulos se instalaron
-echo "Verifying modules installation..."
-terraform get
-echo "✅ Modules installed successfully:"
-find .terraform/modules -type d -name "*" | head -10
+# Forzar la instalación de providers (nuevo paso crítico)
+echo "Ensuring providers are installed..."
+terraform init -upgrade
+
+# Verificar que todo está instalado
+echo "Verifying installation..."
+terraform version
+terraform providers
 
 echo "✅ Terraform backend initialized successfully!"
 echo "✅ All modules installed successfully!"
+echo "✅ All providers installed successfully!"
