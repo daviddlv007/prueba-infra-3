@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main, develop]
   push:
-    branches: [develop]
+    branches: [main, develop]
   workflow_dispatch: # Ejecución manual
 
 env:
@@ -71,14 +71,13 @@ jobs:
       with:
         directory: ./infra/terraform
 
-    # En el paso "Terraform Plan", agregar timeout:
     - name: Terraform Plan
       run: |
         cd ./infra/terraform/environments/dev
         timeout 600 terraform plan -no-color -out=tfplan
       env:
         TF_CLI_ARGS: "-var-file=terraform.tfvars"
-    
+
     - name: Upload Terraform Plan
       uses: actions/upload-artifact@v4
       with:
@@ -88,4 +87,3 @@ jobs:
 
     - name: Generate Cost Estimation
       run: ./infra/terraform/scripts/cost-estimate.sh dev
-      if: always()
