@@ -34,7 +34,7 @@ if ! aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
           "SSEAlgorithm": "AES256"
         }
       }]
-    }"
+    }'
 else
   echo "S3 bucket already exists: ${BUCKET_NAME}"
 fi
