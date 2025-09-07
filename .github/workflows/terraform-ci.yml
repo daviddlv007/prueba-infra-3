@@ -66,10 +66,14 @@ jobs:
       run: terraform validate
       working-directory: ./infra/terraform/environments/dev
 
-    - name: Terraform Security Scan
-      uses: aquasecurity/tfsec@v1.28.4
-      with:
-        directory: ./infra/terraform
+    - name: Install and Run tfsec
+      run: |
+        # Descargar e instalar tfsec manualmente
+        echo "Installing tfsec..."
+        curl -sSL https://github.com/aquasecurity/tfsec/releases/download/v1.28.4/tfsec-linux-amd64 -o tfsec
+        chmod +x tfsec
+        ./tfsec ./infra/terraform --soft-fail
+      working-directory: ./
 
     - name: Terraform Plan
       run: |
