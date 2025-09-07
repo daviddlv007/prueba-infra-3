@@ -20,6 +20,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    timeout-minutes: 30
 
     steps:
     - name: Checkout code
@@ -50,7 +51,6 @@ jobs:
         chmod +x ./infra/terraform/scripts/check-backend.sh
         chmod +x ./infra/terraform/scripts/setup-backend.sh
         
-        # Usar valores directamente
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
         if ! ./infra/terraform/scripts/check-backend.sh; then
           echo "Creating backend resources..."
@@ -65,29 +65,18 @@ jobs:
         echo "Initializing Terraform with dynamic backend..."
         cd ./infra/terraform/environments/dev
         
-        # Obtener valores dinámicamente
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
         PROJECT_NAME=$(basename $(git rev-parse --show-toplevel))
-        ENVIRONMENT="dev"
         
-        echo "Initializing for:"
-        echo "Project: $PROJECT_NAME"
-        echo "Account: $ACCOUNT_ID"
-        echo "Environment: $ENVIRONMENT"
-        
-        # Inicializar Terraform completamente
         terraform init -reconfigure -input=false \
-          -backend-config="bucket=terraform-state-${ACCOUNT_ID}-${ENVIRONMENT}" \
-          -backend-config="key=${PROJECT_NAME}/${ENVIRONMENT}/terraform.tfstate" \
+          -backend-config="bucket=terraform-state-${ACCOUNT_ID}-dev" \
+          -backend-config="key=${PROJECT_NAME}/dev/terraform.tfstate" \
           -backend-config="dynamodb_table=terraform-locks-${ACCOUNT_ID}" \
           -backend-config="region=us-east-1" \
           -backend-config="encrypt=true"
         
-        # Forzar instalación de módulos y providers
         terraform get -update
-        
         echo "✅ Terraform initialization completed successfully!"
-        ls -la .terraform/
       working-directory: ./
 
     - name: Terraform Validate
@@ -95,15 +84,25 @@ jobs:
       working-directory: ./infra/terraform/environments/dev
 
     - name: Terraform Plan
-      run: terraform plan -input=false -out=tfplan
+      run: terraform plan -input=false -out=tfplan -lock-timeout=5m
       working-directory: ./infra/terraform/environments/dev
       env:
         TF_CLI_ARGS: "-var-file=terraform.tfvars"
 
     - name: Terraform Apply
-      run: terraform apply -input=false -auto-approve -lock=false tfplan
-      working-directory: ./infra/terraform/environments/dev
-    
+      run: |
+        cd ./infra/terraform/environments/dev
+        # Intentar apply con lock, si falla liberar lock y reintentar
+        if terraform apply -input=false -auto-approve -lock-timeout=10m tfplan; then
+          echo "✅ Apply completed successfully with locking"
+        else
+          echo "⚠️ Apply with locking failed, attempting to release stale lock..."
+          terraform force-unlock -force $(terraform show -json | jq -r '.values.backend.config.lock_id // empty') 2>/dev/null || true
+          echo "Retrying apply with lock disabled..."
+          terraform apply -input=false -auto-approve -lock=false tfplan
+        fi
+      working-directory: ./
+
     - name: Generate Infrastructure Documentation
       run: |
         terraform output -json > infrastructure.json

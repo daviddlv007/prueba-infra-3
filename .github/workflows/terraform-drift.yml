@@ -13,6 +13,7 @@ jobs:
   terraform-drift:
     name: 'Terraform Drift Detection'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
     - name: Checkout code
@@ -35,14 +36,12 @@ jobs:
         echo "Initializing Terraform for drift detection..."
         cd ./infra/terraform/environments/dev
         
-        # Obtener valores dinámicamente
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
         PROJECT_NAME=$(basename $(git rev-parse --show-toplevel))
-        ENVIRONMENT="dev"
         
         terraform init -reconfigure -input=false \
-          -backend-config="bucket=terraform-state-${ACCOUNT_ID}-${ENVIRONMENT}" \
-          -backend-config="key=${PROJECT_NAME}/${ENVIRONMENT}/terraform.tfstate" \
+          -backend-config="bucket=terraform-state-${ACCOUNT_ID}-dev" \
+          -backend-config="key=${PROJECT_NAME}/dev/terraform.tfstate" \
           -backend-config="dynamodb_table=terraform-locks-${ACCOUNT_ID}" \
           -backend-config="region=us-east-1" \
           -backend-config="encrypt=true"
@@ -52,6 +51,6 @@ jobs:
       
     - name: Check for drift
       run: |
-        terraform plan -detailed-exitcode
+        terraform plan -detailed-exitcode -lock-timeout=5m
       working-directory: ./infra/terraform/environments/dev
       continue-on-error: true
