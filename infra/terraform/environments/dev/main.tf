@@ -1,12 +1,9 @@
-module "backend" {
-  source = "../../modules/backend"
+data "aws_s3_bucket" "terraform_state" {
+  bucket = "terraform-state-${local.account_id}-dev"
+}
 
-  bucket_name     = "terraform-state-${data.aws_caller_identity.current.account_id}-dev"
-  lock_table_name = "terraform-locks-${data.aws_caller_identity.current.account_id}"
-  tags = {
-    Environment = "dev"
-    Project     = var.project_name
-  }
+data "aws_dynamodb_table" "terraform_locks" {
+  name = "terraform-locks-${local.account_id}"
 }
 
 module "network" {
