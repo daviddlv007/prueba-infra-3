@@ -1,0 +1,91 @@
+name: 'Terraform CI'
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+  workflow_dispatch: # Ejecución manual
+
+env:
+  TF_VERSION: 1.8.2
+  AWS_REGION: us-east-1
+
+jobs:
+  terraform-ci:
+    name: 'Terraform Validate, Setup & Plan'
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Setup Terraform Backend (if needed)
+      id: setup-backend
+      run: |
+        if ./infra/terraform/scripts/check-backend.sh; then
+          echo "Backend already exists"
+          echo "backend_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "Creating backend resources..."
+          ./infra/terraform/scripts/setup-backend.sh
+          echo "backend_exists=false" >> $GITHUB_OUTPUT
+        fi
+      shell: bash
+
+    - name: Terraform Format Check
+      run: terraform fmt -check -recursive
+      working-directory: ./infra/terraform
+
+    - name: Terraform Init
+      run: |
+        if [ "${{ steps.setup-backend.outputs.backend_exists }}" = "false" ]; then
+          echo "Initializing new backend..."
+          cd ./infra/terraform/environments/dev
+          terraform init -reconfigure
+        else
+          echo "Initializing existing backend..."
+          cd ./infra/terraform/environments/dev
+          terraform init
+        fi
+
+    - name: Terraform Validate
+      run: terraform validate
+      working-directory: ./infra/terraform/environments/dev
+
+    - name: Terraform Security Scan
+      uses: aquasecurity/tfsec@main
+      with:
+        directory: ./infra/terraform
+
+    # En el paso "Terraform Plan", agregar timeout:
+    - name: Terraform Plan
+      run: |
+        cd ./infra/terraform/environments/dev
+        timeout 600 terraform plan -no-color -out=tfplan
+      env:
+        TF_CLI_ARGS: "-var-file=terraform.tfvars"
+    
+    - name: Upload Terraform Plan
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraform-plan
+        path: infra/terraform/environments/dev/tfplan
+        if-no-files-found: ignore
+
+    - name: Generate Cost Estimation
+      run: ./infra/terraform/scripts/cost-estimate.sh dev
+      if: always()
