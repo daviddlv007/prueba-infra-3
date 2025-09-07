@@ -27,7 +27,9 @@ fi
 
 # Devolver código de salida
 if [ "$S3_EXISTS" = true ] && [ "$DYNAMO_EXISTS" = true ]; then
+    echo "Backend resources are ready"
     exit 0
 else
+    echo "Backend resources are missing"
     exit 1
 fi

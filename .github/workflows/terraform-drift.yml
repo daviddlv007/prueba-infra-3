@@ -30,9 +30,15 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
+    - name: Terraform Init
+      run: |
+        echo "Initializing backend for drift detection..."
+        chmod +x ./infra/terraform/scripts/init-backend.sh
+        ./infra/terraform/scripts/init-backend.sh
+      working-directory: ./infra/terraform/environments/dev
+
     - name: Check for drift
       run: |
-        terraform init
         terraform plan -detailed-exitcode
-      working-directory: ./infra/terraform/environments/dev  # ← CAMBIAR de prod a dev
-      continue-on-error: true  # ← AGREGAR para no fallar el workflow
+      working-directory: ./infra/terraform/environments/dev
+      continue-on-error: true  # ← Esto ya está bien

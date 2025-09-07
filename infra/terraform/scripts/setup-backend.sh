@@ -18,7 +18,7 @@ echo "Region: ${REGION}"
 if ! aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
   echo "Creating S3 bucket: ${BUCKET_NAME}"
   
-  # us-east-1 requiere de un tratamiento especial
+  # us-east-1 requiere un tratamiento especial
   if [ "$REGION" = "us-east-1" ]; then
     aws s3api create-bucket \
       --bucket "${BUCKET_NAME}" \
@@ -43,6 +43,8 @@ if ! aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
         }
       }]
     }'
+  
+  echo "S3 bucket created successfully: ${BUCKET_NAME}"
 else
   echo "S3 bucket already exists: ${BUCKET_NAME}"
 fi
@@ -56,6 +58,8 @@ if ! aws dynamodb describe-table --table-name "${TABLE_NAME}" 2>/dev/null; then
     --key-schema AttributeName=LockID,KeyType=HASH \
     --billing-mode PAY_PER_REQUEST \
     --region "${REGION}"
+  
+  echo "DynamoDB table created successfully: ${TABLE_NAME}"
 else
   echo "DynamoDB table already exists: ${TABLE_NAME}"
 fi

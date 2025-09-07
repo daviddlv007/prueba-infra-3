@@ -56,10 +56,11 @@ jobs:
         fi
 
     - name: Terraform Init
-      run: terraform init -reconfigure -input=false
+      run: |
+        echo "Initializing backend with dynamic configuration..."
+        chmod +x ./infra/terraform/scripts/init-backend.sh
+        ./infra/terraform/scripts/init-backend.sh
       working-directory: ./infra/terraform/environments/dev
-      env:
-        TF_CLI_ARGS: "-var-file=terraform.tfvars"
 
     - name: Terraform Validate
       run: terraform validate
