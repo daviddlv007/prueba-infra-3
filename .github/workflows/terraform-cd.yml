@@ -62,6 +62,15 @@ jobs:
         ./infra/terraform/scripts/init-backend.sh
       working-directory: ./
 
+    - name: Verify Modules Installation
+      run: |
+        echo "=== Verifying modules installation ==="
+        cd ./infra/terraform/environments/dev
+        terraform get
+        terraform list
+        echo "=== Modules verification complete ==="
+      working-directory: ./
+
     - name: Terraform Validate
       run: terraform validate
       working-directory: ./infra/terraform/environments/dev
