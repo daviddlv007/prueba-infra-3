@@ -18,7 +18,7 @@ echo "Region: ${REGION}"
 if ! aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then
   echo "Creating S3 bucket: ${BUCKET_NAME}"
   
-  # us-east-1 requiere un tratamiento especial
+  # us-east-1 requiere de un tratamiento especial
   if [ "$REGION" = "us-east-1" ]; then
     aws s3api create-bucket \
       --bucket "${BUCKET_NAME}" \
