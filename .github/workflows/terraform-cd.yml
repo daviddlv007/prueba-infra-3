@@ -60,8 +60,8 @@ jobs:
         echo "Initializing backend with dynamic configuration..."
         chmod +x ./infra/terraform/scripts/init-backend.sh
         ./infra/terraform/scripts/init-backend.sh
-      working-directory: ./infra/terraform/environments/dev
-
+      working-directory: ./
+      
     - name: Terraform Validate
       run: terraform validate
       working-directory: ./infra/terraform/environments/dev

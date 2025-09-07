@@ -35,8 +35,8 @@ jobs:
         echo "Initializing backend for drift detection..."
         chmod +x ./infra/terraform/scripts/init-backend.sh
         ./infra/terraform/scripts/init-backend.sh
-      working-directory: ./infra/terraform/environments/dev
-
+      working-directory: ./
+      
     - name: Check for drift
       run: |
         terraform plan -detailed-exitcode
