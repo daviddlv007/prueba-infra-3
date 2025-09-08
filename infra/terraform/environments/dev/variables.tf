@@ -45,3 +45,17 @@ variable "volume_type" {
   type        = string
   default     = "gp3"
 }
+
+# Nueva variable para el nombre del bucket de backend
+variable "backend_bucket" {
+  description = "Name of the S3 bucket for Terraform state"
+  type        = string
+  default     = "prueba-infra-3-dev-7f3a2c"
+}
+
+# Nueva variable para la región
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
+}

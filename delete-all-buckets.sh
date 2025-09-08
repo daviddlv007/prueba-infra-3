@@ -16,21 +16,27 @@ empty_and_delete_bucket() {
 
   while true; do
     tmp=$(mktemp)
-    aws s3api list-object-versions --bucket "$BUCKET" --output json > "$tmp"
+    aws s3api list-object-versions --bucket "$BUCKET" > "$tmp"
 
-    count=$(jq '[.Versions[]?, .DeleteMarkers[]?] | length' "$tmp")
-    if [ "$count" -eq 0 ]; then
+    # Extraer claves y versionId con grep + awk
+    KEYS=$(grep '"Key":' "$tmp" | awk -F'"' '{print $4}')
+    VERSIONIDS=$(grep '"VersionId":' "$tmp" | awk -F'"' '{print $4}')
+
+    if [ -z "$KEYS" ]; then
       rm -f "$tmp"
       break
     fi
 
-    jq '{Objects: ([.Versions[]? | {Key:.Key, VersionId:.VersionId}] + 
-                   [.DeleteMarkers[]? | {Key:.Key, VersionId:.VersionId}]) | .[:1000] }' \
-       "$tmp" > "${tmp}.del"
+    del=$(mktemp)
+    echo '{"Objects":[' > "$del"
+    paste -d' ' <(echo "$KEYS") <(echo "$VERSIONIDS") | \
+    awk '{printf "{\"Key\":\"%s\",\"VersionId\":\"%s\"},", $1, $2}' >> "$del"
+    sed -i 's/,$//' "$del"   # eliminar coma final
+    echo ']}' >> "$del"
 
-    aws s3api delete-objects --bucket "$BUCKET" --delete "file://${tmp}.del" >/dev/null
+    aws s3api delete-objects --bucket "$BUCKET" --delete "file://$del" >/dev/null
 
-    rm -f "$tmp" "${tmp}.del"
+    rm -f "$tmp" "$del"
   done
 
   echo ">> Objetos eliminados. Ahora borrando bucket..."

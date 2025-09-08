@@ -38,7 +38,11 @@ jobs:
     - name: Terraform Init
       run: |
         cd infra/terraform/environments/dev
-        terraform init -backend-config="bucket=${{ env.BACKEND_BUCKET }}" -backend-config="key=${{ env.TF_STATE_KEY }}" -backend-config="region=${{ env.AWS_REGION }}"
+        terraform init -backend-config="bucket=${{ env.BACKEND_BUCKET }}" \
+          -backend-config="key=${{ env.TF_STATE_KEY }}" \
+          -backend-config="region=${{ env.AWS_REGION }}" \
+          -backend-config="dynamodb_table=terraform-state-lock" \
+          -reconfigure
 
     - name: Terraform Validate
       run: |
@@ -54,3 +58,11 @@ jobs:
       run: |
         cd infra/terraform/environments/dev
         terraform apply -auto-approve tfplan
+
+    - name: Output deployment information
+      run: |
+        cd infra/terraform/environments/dev
+        terraform output -json > outputs.json
+        echo "Deployment completed successfully"
+      env:
+        TF_WORKSPACE: default

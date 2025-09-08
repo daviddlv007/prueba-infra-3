@@ -2,6 +2,11 @@ name: Terraform Destroy
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to destroy'
+        required: true
+        default: 'dev'
 
 env:
   AWS_REGION: us-east-1
@@ -30,10 +35,14 @@ jobs:
 
     - name: Terraform Init
       run: |
-        cd infra/terraform/environments/dev
-        terraform init -backend-config="bucket=${{ env.BACKEND_BUCKET }}" -backend-config="key=state/terraform.tfstate" -backend-config="region=${{ env.AWS_REGION }}"
+        cd infra/terraform/environments/${{ github.event.inputs.environment || 'dev' }}
+        terraform init -backend-config="bucket=${{ env.BACKEND_BUCKET }}" \
+          -backend-config="key=state/terraform.tfstate" \
+          -backend-config="region=${{ env.AWS_REGION }}" \
+          -backend-config="dynamodb_table=terraform-state-lock" \
+          -reconfigure
 
     - name: Terraform Destroy
       run: |
-        cd infra/terraform/environments/dev
+        cd infra/terraform/environments/${{ github.event.inputs.environment || 'dev' }}
         terraform destroy -auto-approve -var-file="terraform.tfvars"
