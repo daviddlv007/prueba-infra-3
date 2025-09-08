@@ -27,6 +27,9 @@ jobs:
       table_name: ${{ steps.set-outputs.outputs.table }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -45,9 +48,8 @@ jobs:
           BUCKET_INPUT="${{ github.event.inputs.bucket_name || '' }}"
           TABLE="${{ github.event.inputs.table_name || 'terraform-state-lock' }}"
 
-          # Construir nombre de bucket válido si no se pasó
           if [ -z "$BUCKET_INPUT" ]; then
-            SAFE_REPO="${GITHUB_REPOSITORY//\//-}"          
+            SAFE_REPO="${GITHUB_REPOSITORY//\//-}"
             BUCKET="${PROJECT}-${SAFE_REPO}-backend"
             BUCKET=$(echo "$BUCKET" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9.-]//g')
           else
@@ -65,7 +67,6 @@ jobs:
               aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" \
                 --create-bucket-configuration LocationConstraint=$REGION
             fi
-
             aws s3api put-bucket-encryption --bucket "$BUCKET" \
               --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
             aws s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled
@@ -92,25 +93,17 @@ jobs:
           echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
           echo "table=$TABLE" >> "$GITHUB_OUTPUT"
 
-      - name: Crear secrets automáticos con PAT
-        if: ${{ secrets.PA_TOKEN != '' }}
-        uses: gliech/create-github-secret-action@v1
-        with:
-          pa_token: ${{ secrets.PA_TOKEN }}
-          name: BACKEND_BUCKET
-          value: ${{ steps.set-outputs.outputs.bucket }}
-
-      - name: Crear secret BACKEND_TABLE
-        if: ${{ secrets.PA_TOKEN != '' }}
-        uses: gliech/create-github-secret-action@v1
-        with:
-          pa_token: ${{ secrets.PA_TOKEN }}
-          name: BACKEND_TABLE
-          value: ${{ steps.set-outputs.outputs.table }}
-
-      - name: Instrucciones si no se usó PAT
-        if: ${{ secrets.PA_TOKEN == '' }}
+      - name: Crear secrets automáticos con PAT (si existe)
         run: |
-          echo "Si no usaste PAT, copia los valores de los outputs y crea manualmente los secrets del repo:"
-          echo "  BACKEND_BUCKET -> ${{ steps.set-outputs.outputs.bucket }}"
-          echo "  BACKEND_TABLE  -> ${{ steps.set-outputs.outputs.table }}"
+          if [ -n "${{ secrets.PA_TOKEN }}" ]; then
+            echo "Creando secret BACKEND_BUCKET..."
+            gh secret set BACKEND_BUCKET --body "${{ steps.set-outputs.outputs.bucket }}"
+            echo "Creando secret BACKEND_TABLE..."
+            gh secret set BACKEND_TABLE --body "${{ steps.set-outputs.outputs.table }}"
+          else
+            echo "No hay PAT definido, copia los outputs manualmente para crear los secrets:"
+            echo "  BACKEND_BUCKET -> ${{ steps.set-outputs.outputs.bucket }}"
+            echo "  BACKEND_TABLE  -> ${{ steps.set-outputs.outputs.table }}"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.PA_TOKEN }}
