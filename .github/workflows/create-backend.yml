@@ -1,4 +1,4 @@
-name: Crear Backend S3 + DynamoDB
+name: Crear Backend S3 y DynamoDB
 
 on:
   workflow_dispatch:
@@ -36,8 +36,13 @@ jobs:
           set -euo pipefail
           PROJECT="${{ github.event.inputs.project_name || 'prueba-infra-3' }}"
           REGION="${{ github.event.inputs.aws_region || 'us-east-1' }}"
-          BUCKET="${{ github.event.inputs.bucket_name || format('%s-%s-backend', PROJECT, github.repository) }}"
+          BUCKET="${{ github.event.inputs.bucket_name || '' }}"
           TABLE="${{ github.event.inputs.table_name || 'terraform-state-lock' }}"
+
+          # Si no se pasó bucket_name, se construye en Bash
+          if [ -z "$BUCKET" ]; then
+            BUCKET="${PROJECT}-${GITHUB_REPOSITORY}-backend"
+          fi
 
           echo "Verificando bucket S3..."
           if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
@@ -70,3 +75,4 @@ jobs:
           fi
 
           echo "Backend listo."
+
