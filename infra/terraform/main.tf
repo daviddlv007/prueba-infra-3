@@ -1,5 +1,3 @@
-# main.tf - MVP funcional y limpio
-
 terraform {
   required_version = ">= 1.6.0"
 
@@ -8,14 +6,6 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 4.0"
     }
-  }
-
-  backend "s3" {
-    bucket         = var.backend_bucket   # Pasado desde workflow o secret
-    key            = "terraform.tfstate"
-    region         = var.aws_region
-    dynamodb_table = var.backend_table
-    encrypt        = true
   }
 }
 
@@ -37,4 +27,3 @@ resource "aws_instance" "this" {
     Name = "${var.project_name}-ec2"
   }
 }
-

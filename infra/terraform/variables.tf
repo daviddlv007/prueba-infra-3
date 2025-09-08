@@ -32,11 +32,3 @@ variable "aws_region" {
   type    = string
   default = "us-east-1"
 }
-
-variable "backend_bucket" {
-  type = string
-}
-
-variable "backend_table" {
-  type = string
-}

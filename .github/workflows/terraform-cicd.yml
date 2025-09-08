@@ -11,7 +11,7 @@ on:
         description: 'Nombre del proyecto'
         required: false
       aws_region:
-        description: 'Región AWS'
+        description: 'Región AWS (override)'
         required: false
 
 permissions:
@@ -24,11 +24,23 @@ jobs:
     env:
       TF_BUCKET: ${{ secrets.BACKEND_BUCKET }}
       TF_TABLE: ${{ secrets.BACKEND_TABLE }}
-      TF_REGION: ${{ github.event.inputs.aws_region || 'us-east-1' }}
+      TF_REGION: ${{ github.event.inputs.aws_region || secrets.AWS_REGION || 'us-east-1' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validar secrets requeridos
+        run: |
+          if [ -z "${TF_BUCKET:-}" ]; then
+            echo "ERROR: secret BACKEND_BUCKET no definido. Ejecuta create-backend y guarda BACKEND_BUCKET en Secrets."
+            exit 1
+          fi
+          if [ -z "${TF_TABLE:-}" ]; then
+            echo "ERROR: secret BACKEND_TABLE no definido. Ejecuta create-backend y guarda BACKEND_TABLE en Secrets."
+            exit 1
+          fi
+        shell: bash
 
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v2
@@ -48,13 +60,14 @@ jobs:
             echo "ERROR: Tabla DynamoDB $TF_TABLE no existe. Ejecuta create-backend primero."
             exit 1
           fi
+        shell: bash
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: "1.6.0"
 
-      - name: Terraform Init
+      - name: Terraform Init (configura backend en S3/DynamoDB)
         run: |
           terraform init \
             -backend-config="bucket=$TF_BUCKET" \
@@ -63,16 +76,20 @@ jobs:
             -backend-config="dynamodb_table=$TF_TABLE" \
             -reconfigure
         working-directory: infra/terraform
+        shell: bash
 
       - name: Terraform Validate
         run: terraform validate
         working-directory: infra/terraform
+        shell: bash
 
       - name: Terraform Plan
         run: terraform plan -out=tfplan -input=false
         working-directory: infra/terraform
+        shell: bash
 
       - name: Terraform Apply
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: terraform apply -input=false -auto-approve tfplan
         working-directory: infra/terraform
+        shell: bash
