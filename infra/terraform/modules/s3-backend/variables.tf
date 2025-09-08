@@ -19,8 +19,8 @@ variable "lock_table_name" {
   default     = "terraform-state-lock"
 }
 
-variable "create_resources" {
-  description = "Whether to create the backend resources or assume they exist"
+variable "import_existing" {
+  description = "Whether to import existing resources instead of creating new ones"
   type        = bool
-  default     = true
+  default     = false
 }
