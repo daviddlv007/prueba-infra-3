@@ -12,6 +12,8 @@ env:
   AWS_REGION: us-east-1
   BACKEND_BUCKET: prueba-infra-3-dev-7f3a2c
   PROJECT_NAME: prueba-infra-3
+  TF_STATE_KEY: state/terraform.tfstate
+  LOCK_TABLE: terraform-state-lock
 
 jobs:
   deploy-backend:

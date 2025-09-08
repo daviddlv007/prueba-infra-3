@@ -12,6 +12,7 @@ on:
 env:
   AWS_REGION: us-east-1
   BACKEND_BUCKET: prueba-infra-3-dev-7f3a2c
+  TF_STATE_KEY: state/terraform.tfstate
 
 jobs:
   terraform:
@@ -37,7 +38,7 @@ jobs:
     - name: Terraform Init
       run: |
         cd infra/terraform/environments/dev
-        terraform init -backend-config="bucket=${{ env.BACKEND_BUCKET }}" -backend-config="key=state/terraform.tfstate" -backend-config="region=${{ env.AWS_REGION }}"
+        terraform init -backend-config="bucket=${{ env.BACKEND_BUCKET }}" -backend-config="key=${{ env.TF_STATE_KEY }}" -backend-config="region=${{ env.AWS_REGION }}"
 
     - name: Terraform Validate
       run: |
@@ -47,9 +48,9 @@ jobs:
     - name: Terraform Plan
       run: |
         cd infra/terraform/environments/dev
-        terraform plan -var-file="terraform.tfvars"
+        terraform plan -var-file="terraform.tfvars" -out=tfplan
 
     - name: Terraform Apply
       run: |
         cd infra/terraform/environments/dev
-        terraform apply -auto-approve -var-file="terraform.tfvars"
+        terraform apply -auto-approve tfplan

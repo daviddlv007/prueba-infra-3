@@ -9,7 +9,9 @@ terraform {
   }
 
   backend "s3" {
-
+    # Estos valores se inyectan via CLI en el workflow
+    encrypt        = true
+    use_lockfile   = true
   }
 }
 
