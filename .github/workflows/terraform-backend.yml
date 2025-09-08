@@ -1,0 +1,55 @@
+name: Terraform Backend Setup
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/terraform/modules/s3-backend/**'
+      - '.github/workflows/terraform-backend.yml'
+
+env:
+  AWS_REGION: us-east-1
+  BACKEND_BUCKET: prueba-infra-3-dev-7f3a2c
+  PROJECT_NAME: prueba-infra-3
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform Init (Backend)
+      run: |
+        cd infra/terraform/modules/s3-backend
+        terraform init
+
+    - name: Terraform Validate (Backend)
+      run: |
+        cd infra/terraform/modules/s3-backend
+        terraform validate
+
+    - name: Terraform Plan (Backend)
+      run: |
+        cd infra/terraform/modules/s3-backend
+        terraform plan -var="bucket_name=${{ env.BACKEND_BUCKET }}" -var="region=${{ env.AWS_REGION }}" -var="project_name=${{ env.PROJECT_NAME }}"
+
+    - name: Terraform Apply (Backend)
+      run: |
+        cd infra/terraform/modules/s3-backend
+        terraform apply -auto-approve -var="bucket_name=${{ env.BACKEND_BUCKET }}" -var="region=${{ env.AWS_REGION }}" -var="project_name=${{ env.PROJECT_NAME }}"

@@ -1,118 +1,98 @@
-# Prueba Infra 2 - Infrastructure as Code
+# Infraestructura como Código - Proyecto prueba-infra-3
 
-Terraform configuration following DevOps best practices for 2025.
+Este proyecto implementa infraestructura en AWS utilizando Terraform y GitHub Actions para automatización completa.
 
-## Structure
-
-infra/terraform/
-├── modules/ # Reusable modules
-├── environments/ # Environment-specific configurations
-├── scripts/ # Automation scripts
-└── Makefile # Common commands
-
-
-## Getting Started
-
-1. **Setup Backend**:
-   ```bash
-   cd infra/terraform
-   make setup-backend
-
-Initialize Terraform:
-
-    make init
-
-Plan and Apply:
-
-
-    make plan
-    make apply
-
-Environments
-dev: Development environment
-
-staging: Staging environment
-
-prod: Production environment
-
-
-CI/CD
-GitHub Actions workflows:
-
-terraform-ci.yml: Validation and planning on PRs
-
-terraform-cd.yml: Deployment to production
-
-terraform-drift.yml: Drift detection
-
-Secrets
-Configure the following secrets in GitHub:
-
-AWS_ACCESS_KEY_ID
-
-AWS_SECRET_ACCESS_KEY
-
-AWS_KEY_NAME (for EC2 key pair)
-
+## Estructura del Proyecto
+├── .github/workflows/ # Pipelines de CI/CD
+├── infra/terraform/ # Código de Terraform
+│ ├── environments/ # Configuración por entorno
+│ └── modules/ # Módulos reutilizables
 
 text
 
-## 🛠️ Implementación Paso a Paso
+## Módulos Implementados
 
-1. **Preparación inicial**:
-   ```bash
-   mkdir -p prueba-infra-2/{.github/workflows,infra/terraform/{modules/{network,compute,backend},environments/{dev,staging,prod},scripts}}
-   cd prueba-infra-2
-Crear los archivos según la estructura anterior
+1. **s3-backend**: Creación de bucket S3 para estado de Terraform
+2. **network**: VPC, subredes, tablas de rutas y grupos de seguridad
+3. **compute**: Instancias EC2 y direcciones IP elásticas
 
-Configurar AWS CLI:
+## Flujos de Trabajo
 
-bash
-aws configure
-Configurar backend:
+1. **terraform-backend.yml**: Crea el bucket S3 para almacenar el estado de Terraform
+2. **terraform-deploy.yml**: Implementa la infraestructura completa
+3. **terraform-destroy.yml**: Destruye la infraestructura
+4. **terraform-drift.yml**: Detección de deriva de configuración
 
-bash
+## Configuración Requerida
+
+1. Secrets de GitHub:
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+
+2. Key Pair en AWS:
+   - Nombre: `dev-key`
+   - Región: `us-east-1`
+
+## Uso
+
+Los workflows se ejecutan automáticamente al hacer push a la rama main o manualmente desde la pestaña Actions de GitHub.
+
+### Comandos Locales (opcionales)
+
+```bash
 cd infra/terraform
-chmod +x scripts/setup-backend.sh
-./scripts/setup-backend.sh
-Inicializar y probar:
 
-bash
+# Inicializar Terraform
 make init
+
+# Validar configuración
+make validate
+
+# Plan de ejecución
 make plan
-Configurar secrets en GitHub:
 
-AWS_ACCESS_KEY_ID
+# Aplicar cambios
+make apply
 
-AWS_SECRET_ACCESS_KEY
+# Destruir infraestructura
+make destroy
+Recursos Creados
+1 VPC con 2 subredes públicas
 
-AWS_KEY_NAME
+1 instancia EC2 t2.micro
 
-Hacer commit y push para activar los workflows
+1 dirección IP elástica
 
-✅ Mejores Prácticas Implementadas
-Módulos reutilizables para network, compute y backend
+1 bucket S3 para estado de Terraform
 
-Múltiples ambientes con configuraciones separadas
+1 tabla DynamoDB para bloqueo de estado
 
-Estado remoto con S3 y bloqueo con DynamoDB
+Todos los recursos están dentro del nivel gratuito de AWS.
 
-CI/CD automatizado con GitHub Actions
+text
 
-Detector de drift para identificar cambios manuales
+## Instrucciones de Implementación
 
-Seguridad:
+1. **Configura los secrets de GitHub**:
+   - Ve a Settings > Secrets and variables > Actions en tu repositorio
+   - Agrega `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY` con las credenciales de AWS
 
-Encriptación en reposo y tránsito
+2. **Asegúrate de tener la clave SSH en AWS**:
+   - Crea o verifica que existe la clave "dev-key" en la región us-east-1
 
-Credenciales en secrets, no en código
+3. **Realiza el primer commit**:
+   - La estructura de carpetas y archivos se creará automáticamente
+   - El workflow de backend se ejecutará primero para crear el bucket S3
 
-Bloques de acceso público
+4. **Ejecuta el despliegue**:
+   - El workflow de despliegue se ejecutará automáticamente después del backend
+   - O ejecútalo manualmente desde la pestaña Actions
 
-Versionado de Terraform y providers
-
-Automatización con scripts y Makefile
-
-Validación con pre-commit hooks
-
-Documentación completa
+Esta implementación cumple con todos tus requisitos:
+- ✅ 100% Automático mediante GitHub Actions
+- ✅ Idempotente gracias a Terraform
+- ✅ Escalable mediante módulos reutilizables
+- ✅ Modular con separación clara de responsabilidades
+- ✅ Replicable para múltiples entornos
+- ✅ Dentro de la capa gratuita de AWS
+- ✅ Sin scripts manuales (solo GitHub Actions)

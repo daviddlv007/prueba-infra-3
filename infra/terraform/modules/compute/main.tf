@@ -1,7 +1,8 @@
 resource "aws_instance" "main" {
-  ami                    = var.ami_id
+  ami                    = var.instance_ami
   instance_type          = var.instance_type
   key_name               = var.key_name
+  subnet_id              = var.public_subnets[0]
   vpc_security_group_ids = [var.security_group_id]
 
   root_block_device {
@@ -10,16 +11,20 @@ resource "aws_instance" "main" {
     encrypted   = true
   }
 
-  metadata_options {
-    http_endpoint = "enabled"
-    http_tokens   = "required"
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-ec2"
+    Environment = var.environment
+    Project     = var.project_name
   }
+}
 
-  tags = merge(var.tags, {
-    Name = var.name
-  })
+resource "aws_eip" "instance" {
+  instance = aws_instance.main.id
+  domain   = "vpc"
 
-  lifecycle {
-    ignore_changes = [ami]
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-eip"
+    Environment = var.environment
+    Project     = var.project_name
   }
 }

@@ -1,43 +1,44 @@
-variable "name" {
-  description = "Instance name"
+variable "project_name" {
+  description = "Name of the project"
   type        = string
 }
 
-variable "ami_id" {
-  description = "AMI ID"
+variable "environment" {
+  description = "Environment (e.g., dev, prod)"
+  type        = string
+}
+
+variable "public_subnets" {
+  description = "List of public subnet IDs"
+  type        = list(string)
+}
+
+variable "security_group_id" {
+  description = "ID of the security group"
+  type        = string
+}
+
+variable "instance_ami" {
+  description = "AMI ID for the EC2 instance"
   type        = string
 }
 
 variable "instance_type" {
-  description = "Instance type"
+  description = "Instance type for the EC2 instance"
   type        = string
-  default     = "t2.micro"
 }
 
 variable "key_name" {
-  description = "Key pair name"
-  type        = string
-}
-
-variable "security_group_id" {
-  description = "Security Group ID"
+  description = "Name of the key pair for SSH access"
   type        = string
 }
 
 variable "volume_size" {
-  description = "Root volume size"
+  description = "Size of the root volume in GB"
   type        = number
-  default     = 8
 }
 
 variable "volume_type" {
-  description = "Root volume type"
+  description = "Type of the root volume (e.g., gp3, gp2)"
   type        = string
-  default     = "gp3"
-}
-
-variable "tags" {
-  description = "Additional tags"
-  type        = map(string)
-  default     = {}
 }

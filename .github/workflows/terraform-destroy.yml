@@ -1,58 +1,22 @@
-name: 'Terraform Destroy'
+name: Terraform Destroy
 
 on:
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to destroy'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
-      confirm_destroy:
-        description: 'Type "DESTROY" to confirm'
-        required: true
-        type: string
 
 env:
-  TF_VERSION: 1.8.2
   AWS_REGION: us-east-1
-  DESTROY_TIMEOUT: 15m
+  BACKEND_BUCKET: prueba-infra-3-dev-7f3a2c
 
 jobs:
   terraform-destroy:
-    name: 'Terraform Destroy - ${{ github.event.inputs.environment }}'
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment }}
     permissions:
       id-token: write
       contents: read
-    timeout-minutes: 30
-
-    if: ${{ github.event.inputs.confirm_destroy == 'DESTROY' }}
-
+    
     steps:
-    - name: Validate destruction confirmation
-      run: |
-        if [ "${{ github.event.inputs.confirm_destroy }}" != "DESTROY" ]; then
-          echo "❌ Destruction not confirmed. You must type 'DESTROY' to proceed."
-          exit 1
-        fi
-        echo "✅ Destruction confirmed. Proceeding with terraform destroy..."
-
-    - name: Checkout code
+    - name: Checkout
       uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref }}
-
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: ${{ env.TF_VERSION }}
-        terraform_wrapper: false
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -61,102 +25,15 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    - name: Setup environment variables
-      run: |
-        echo "PROJECT_NAME=$(basename $GITHUB_REPOSITORY)" >> $GITHUB_ENV
-        echo "ENVIRONMENT=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-
-    - name: Dynamic Backend Configuration
-      run: |
-        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-        echo "TF_BACKEND_BUCKET=terraform-state-${ACCOUNT_ID}-${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-        echo "TF_BACKEND_KEY=$(basename $GITHUB_REPOSITORY)/${{ github.event.inputs.environment }}/terraform.tfstate" >> $GITHUB_ENV
-        echo "TF_LOCK_TABLE=terraform-locks-${ACCOUNT_ID}" >> $GITHUB_ENV
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
 
     - name: Terraform Init
       run: |
-        echo "Initializing Terraform for destruction..."
-        cd ./infra/terraform/environments/${{ github.event.inputs.environment }}
-        
-        # COMANDO CORREGIDO - backend-config separados
-        terraform init -reconfigure -input=false \
-          -backend-config="bucket=${{ env.TF_BACKEND_BUCKET }}" \
-          -backend-config="key=${{ env.TF_BACKEND_KEY }}" \
-          -backend-config="dynamodb_table=${{ env.TF_LOCK_TABLE }}" \
-          -backend-config="region=${{ env.AWS_REGION }}" \
-          -backend-config="encrypt=true"
-        
-        echo "✅ Terraform initialized for destruction"
-      working-directory: ./
-
-    - name: Pre-Destroy Validation
-      run: |
-        cd ./infra/terraform/environments/${{ github.event.inputs.environment }}
-        echo "=== RESOURCES TO BE DESTROYED ==="
-        terraform state list
-        echo "================================="
-        
-        RESOURCE_COUNT=$(terraform state list | wc -l)
-        if [ "$RESOURCE_COUNT" -eq 0 ]; then
-          echo "ℹ️ No resources found in state. Nothing to destroy."
-          echo "SKIP_DESTROY=true" >> $GITHUB_ENV
-        else
-          echo "Found $RESOURCE_COUNT resources to destroy"
-          echo "SKIP_DESTROY=false" >> $GITHUB_ENV
-        fi
+        cd infra/terraform/environments/dev
+        terraform init -backend-config="bucket=${{ env.BACKEND_BUCKET }}" -backend-config="key=state/terraform.tfstate" -backend-config="region=${{ env.AWS_REGION }}"
 
     - name: Terraform Destroy
-      if: env.SKIP_DESTROY == 'false'
       run: |
-        cd ./infra/terraform/environments/${{ github.event.inputs.environment }}
-        
-        timeout ${{ env.DESTROY_TIMEOUT }} terraform destroy \
-          -auto-approve \
-          -input=false \
-          -parallelism=15 \
-          -refresh=false \
-          -lock-timeout=5m
-        
-        echo "✅ Terraform destroy completed successfully"
-      working-directory: ./
-
-    - name: Cleanup Empty State
-      if: success() && env.SKIP_DESTROY == 'false'
-      run: |
-        # Verificar si el estado está vacío
-        STATE_CONTENT=$(aws s3 cp s3://${{ env.TF_BACKEND_BUCKET }}/${{ env.TF_BACKEND_KEY }} - 2>/dev/null || echo "empty")
-        
-        if [ "$STATE_CONTENT" = "empty" ] || echo "$STATE_CONTENT" | grep -q "\"resources\": \[\]"; then
-          echo "🗑️ State file is empty, removing from S3..."
-          aws s3 rm s3://${{ env.TF_BACKEND_BUCKET }}/${{ env.TF_BACKEND_KEY }}
-        else
-          echo "ℹ️ State file not empty, preserving in S3"
-        fi
-
-    - name: Generate Destruction Report
-      run: |
-        echo "=== DESTRUCTION REPORT ===" > destroy-report.md
-        echo "Timestamp: $(date)" >> destroy-report.md
-        echo "Environment: ${{ github.event.inputs.environment }}" >> destroy-report.md
-        echo "Project: ${{ env.PROJECT_NAME }}" >> destroy-report.md
-        echo "Status: ${{ job.status }}" >> destroy-report.md
-        
-        if [ "$SKIP_DESTROY" = "true" ]; then
-          echo "Action: No resources found to destroy" >> destroy-report.md
-        else
-          echo "Action: Terraform destroy executed" >> destroy-report.md
-        fi
-        
-        cat destroy-report.md
-
-    - name: Upload Destruction Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: destruction-report-${{ github.event.inputs.environment }}
-        path: destroy-report.md
-
-    - name: Simple Failure Notification
-      if: failure()
-      run: |
-        echo "::error::Terraform destroy failed for environment ${{ github.event.inputs.environment }}"
-        echo "::warning::Check details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        cd infra/terraform/environments/dev
+        terraform destroy -auto-approve -var-file="terraform.tfvars"

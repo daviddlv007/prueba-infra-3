@@ -1,16 +1,20 @@
-name: Terraform Drift Detection
+name: Terraform Deploy
 
 on:
-  schedule:
-    - cron: '0 8 * * 1-5' # Ejecutar cada día laboral a las 8 AM
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/terraform/environments/dev/**'
+      - 'infra/terraform/modules/**'
+      - '.github/workflows/terraform-deploy.yml'
 
 env:
   AWS_REGION: us-east-1
   BACKEND_BUCKET: prueba-infra-3-dev-7f3a2c
 
 jobs:
-  terraform-drift:
+  terraform:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -35,15 +39,17 @@ jobs:
         cd infra/terraform/environments/dev
         terraform init -backend-config="bucket=${{ env.BACKEND_BUCKET }}" -backend-config="key=state/terraform.tfstate" -backend-config="region=${{ env.AWS_REGION }}"
 
+    - name: Terraform Validate
+      run: |
+        cd infra/terraform/environments/dev
+        terraform validate
+
     - name: Terraform Plan
       run: |
         cd infra/terraform/environments/dev
-        terraform plan -var-file="terraform.tfvars" -detailed-exitcode
-      continue-on-error: true
-      id: tf-plan
+        terraform plan -var-file="terraform.tfvars"
 
-    - name: Notify on Drift
-      if: steps.tf-plan.outcome == 'failure'
+    - name: Terraform Apply
       run: |
-        echo "Terraform plan detected drift! Check the workflow run for details."
-        exit 1
+        cd infra/terraform/environments/dev
+        terraform apply -auto-approve -var-file="terraform.tfvars"
