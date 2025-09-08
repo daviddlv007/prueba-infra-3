@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      project_name:
+        description: 'Nombre del proyecto'
+        required: false
+      aws_region:
+        description: 'Región AWS'
+        required: false
 
 permissions:
   contents: read
@@ -25,25 +32,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
-
-      - name: Validar backend remoto existe
-        run: |
-          BUCKET="${{ secrets.BACKEND_BUCKET }}"
-          TABLE="${{ secrets.BACKEND_TABLE }}"
-          REGION="${{ secrets.AWS_REGION || 'us-east-1' }}"
-
-          echo "Verificando bucket S3..."
-          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-            echo "ERROR: Bucket S3 $BUCKET no existe. Ejecuta create-backend primero."
-            exit 1
-          fi
-
-          echo "Verificando tabla DynamoDB..."
-          if ! aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
-            echo "ERROR: Tabla DynamoDB $TABLE no existe. Ejecuta create-backend primero."
-            exit 1
-          fi
+          aws-region: ${{ github.event.inputs.aws_region || 'us-east-1' }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
@@ -51,7 +40,12 @@ jobs:
           terraform_version: "1.6.0"
 
       - name: Terraform Init
-        run: terraform init -input=false -backend-config="bucket=${{ secrets.BACKEND_BUCKET }}" -backend-config="region=${{ secrets.AWS_REGION || 'us-east-1' }}" -reconfigure
+        run: terraform init \
+              -backend-config="bucket=${{ secrets.BACKEND_BUCKET }}" \
+              -backend-config="region=${{ github.event.inputs.aws_region || 'us-east-1' }}" \
+              -backend-config="key=terraform.tfstate" \
+              -backend-config="dynamodb_table=${{ secrets.BACKEND_TABLE }}" \
+              -reconfigure
         working-directory: infra/terraform
 
       - name: Terraform Validate
@@ -59,7 +53,11 @@ jobs:
         working-directory: infra/terraform
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan -input=false
+        run: terraform plan -out=tfplan -input=false \
+              -var="backend_bucket=${{ secrets.BACKEND_BUCKET }}" \
+              -var="backend_table=${{ secrets.BACKEND_TABLE }}" \
+              -var="aws_region=${{ github.event.inputs.aws_region || 'us-east-1' }}" \
+              -var="project_name=${{ github.event.inputs.project_name || 'prueba-infra-3' }}"
         working-directory: infra/terraform
 
       - name: Terraform Apply
