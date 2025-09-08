@@ -40,11 +40,14 @@ jobs:
           # Verificar si la tabla DynamoDB existe
           if aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
             echo "Tabla DynamoDB encontrada. Ejecutando terraform destroy con lock..."
-            terraform destroy -auto-approve -input=false -lock=true -chdir="$WORKDIR"
+            cd "$WORKDIR"
+            terraform destroy -auto-approve -input=false -lock=true
           else
             echo "Tabla DynamoDB no encontrada. Ejecutando terraform destroy sin lock..."
-            terraform destroy -auto-approve -input=false -lock=false -chdir="$WORKDIR"
+            cd "$WORKDIR"
+            terraform destroy -auto-approve -input=false -lock=false
           fi
+
 
       - name: Cleanup Backend (S3 + DynamoDB)
         run: |
