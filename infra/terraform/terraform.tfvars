@@ -1,0 +1,5 @@
+aws_region     = "us-east-1"
+project_name   = "prueba-infra-3"
+instance_ami   = "ami-00ca32bbc84273381"
+instance_type  = "t2.micro"
+key_name       = "dev-key"
