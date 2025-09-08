@@ -32,8 +32,19 @@ jobs:
         run: terraform init -input=false
 
       - name: Terraform Destroy Resources
-        working-directory: infra/terraform/environments/dev
-        run: terraform destroy -auto-approve
+        run: |
+          set -euo pipefail
+          TABLE="terraform-state-lock"
+          WORKDIR="infra/terraform/environments/dev"
+
+          # Verificar si la tabla DynamoDB existe
+          if aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
+            echo "Tabla DynamoDB encontrada. Ejecutando terraform destroy con lock..."
+            terraform destroy -auto-approve -input=false -lock=true -chdir="$WORKDIR"
+          else
+            echo "Tabla DynamoDB no encontrada. Ejecutando terraform destroy sin lock..."
+            terraform destroy -auto-approve -input=false -lock=false -chdir="$WORKDIR"
+          fi
 
       - name: Cleanup Backend (S3 + DynamoDB)
         run: |
