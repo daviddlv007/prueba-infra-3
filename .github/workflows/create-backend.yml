@@ -22,6 +22,10 @@ permissions:
 jobs:
   create-backend:
     runs-on: ubuntu-latest
+    outputs:
+      bucket_name: ${{ steps.set-outputs.outputs.bucket }}
+      table_name: ${{ steps.set-outputs.outputs.table }}
+
     steps:
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v2
@@ -32,10 +36,10 @@ jobs:
           aws-region: ${{ github.event.inputs.aws_region || 'us-east-1' }}
 
       - name: Crear bucket S3 y tabla DynamoDB
+        id: set-outputs
         run: |
           set -euo pipefail
 
-          # Variables desde inputs de workflow o valores por defecto
           PROJECT="${{ github.event.inputs.project_name || 'prueba-infra-3' }}"
           REGION="${{ github.event.inputs.aws_region || 'us-east-1' }}"
           BUCKET_INPUT="${{ github.event.inputs.bucket_name || '' }}"
@@ -43,9 +47,9 @@ jobs:
 
           # Construir nombre de bucket válido si no se pasó
           if [ -z "$BUCKET_INPUT" ]; then
-            SAFE_REPO="${GITHUB_REPOSITORY//\//-}"          # reemplaza '/' por '-'
+            SAFE_REPO="${GITHUB_REPOSITORY//\//-}"          
             BUCKET="${PROJECT}-${SAFE_REPO}-backend"
-            BUCKET=$(echo "$BUCKET" | tr '[:upper:]' '[:lower:]')  # forzar minúsculas
+            BUCKET=$(echo "$BUCKET" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9.-]//g')
           else
             BUCKET="$BUCKET_INPUT"
           fi
@@ -64,13 +68,9 @@ jobs:
 
             aws s3api put-bucket-encryption --bucket "$BUCKET" \
               --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
-
-            aws s3api put-bucket-versioning --bucket "$BUCKET" \
-              --versioning-configuration Status=Enabled
-
+            aws s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled
             aws s3api put-public-access-block --bucket "$BUCKET" \
               --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
-
             echo "Bucket creado y endurecido"
           fi
 
@@ -88,5 +88,29 @@ jobs:
             echo "Tabla DynamoDB creada"
           fi
 
-          echo "Backend listo."
+          # Exponer outputs para el job
+          echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
+          echo "table=$TABLE" >> "$GITHUB_OUTPUT"
 
+      - name: Crear secrets automáticos con PAT
+        if: ${{ secrets.PA_TOKEN != '' }}
+        uses: gliech/create-github-secret-action@v1
+        with:
+          pa_token: ${{ secrets.PA_TOKEN }}
+          name: BACKEND_BUCKET
+          value: ${{ steps.set-outputs.outputs.bucket }}
+
+      - name: Crear secret BACKEND_TABLE
+        if: ${{ secrets.PA_TOKEN != '' }}
+        uses: gliech/create-github-secret-action@v1
+        with:
+          pa_token: ${{ secrets.PA_TOKEN }}
+          name: BACKEND_TABLE
+          value: ${{ steps.set-outputs.outputs.table }}
+
+      - name: Instrucciones si no se usó PAT
+        if: ${{ secrets.PA_TOKEN == '' }}
+        run: |
+          echo "Si no usaste PAT, copia los valores de los outputs y crea manualmente los secrets del repo:"
+          echo "  BACKEND_BUCKET -> ${{ steps.set-outputs.outputs.bucket }}"
+          echo "  BACKEND_TABLE  -> ${{ steps.set-outputs.outputs.table }}"

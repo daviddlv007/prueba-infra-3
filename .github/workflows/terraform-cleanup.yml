@@ -2,19 +2,6 @@ name: Terraform/Backend Cleanup Total
 
 on:
   workflow_dispatch:
-    inputs:
-      project_name:
-        description: 'Nombre del proyecto'
-        required: false
-      aws_region:
-        description: 'Región AWS'
-        required: false
-      bucket_name:
-        description: 'Bucket S3 backend'
-        required: false
-      table_name:
-        description: 'Tabla DynamoDB backend'
-        required: false
 
 permissions:
   contents: read
@@ -33,23 +20,17 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ github.event.inputs.aws_region || 'us-east-1' }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
-      - name: Validar backend remoto existe
+      - name: Cargar variables de backend
         run: |
-          BUCKET="${{ github.event.inputs.bucket_name || format('%s-%s-backend', github.event.inputs.project_name || 'prueba-infra-3', github.repository) }}"
-          TABLE="${{ github.event.inputs.table_name || 'terraform-state-lock' }}"
-          REGION="${{ github.event.inputs.aws_region || 'us-east-1' }}"
-
-          echo "Verificando bucket S3..."
-          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-            echo "WARNING: Bucket S3 $BUCKET no existe, solo se destruirán recursos locales."
-          fi
-
-          echo "Verificando tabla DynamoDB..."
-          if ! aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
-            echo "WARNING: Tabla DynamoDB $TABLE no existe, solo se destruirán recursos locales."
-          fi
+          BUCKET="${{ secrets.BACKEND_BUCKET }}"
+          TABLE="${{ secrets.BACKEND_TABLE }}"
+          REGION="${{ secrets.AWS_REGION || 'us-east-1' }}"
+          echo "Bucket S3: $BUCKET"
+          echo "Tabla DynamoDB: $TABLE"
+        shell: bash
+        id: set-backend
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
@@ -57,7 +38,7 @@ jobs:
           terraform_version: "1.6.0"
 
       - name: Terraform Init
-        run: terraform init -input=false -backend-config="bucket=$BUCKET" -backend-config="region=$REGION" -reconfigure
+        run: terraform init -input=false -backend-config="bucket=${{ secrets.BACKEND_BUCKET }}" -backend-config="region=${{ secrets.AWS_REGION || 'us-east-1' }}" -reconfigure
         working-directory: infra/terraform
 
       - name: Terraform Destroy Resources
@@ -65,7 +46,7 @@ jobs:
           set -euo pipefail
           WORKDIR="infra/terraform"
 
-          if aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
+          if aws dynamodb describe-table --table-name "${{ secrets.BACKEND_TABLE }}" >/dev/null 2>&1; then
             echo "Tabla DynamoDB encontrada. Ejecutando terraform destroy con lock..."
             cd "$WORKDIR"
             terraform destroy -auto-approve -input=false -lock=true
@@ -78,6 +59,9 @@ jobs:
       - name: Cleanup Backend (S3 + DynamoDB)
         run: |
           set -euo pipefail
+          BUCKET="${{ secrets.BACKEND_BUCKET }}"
+          TABLE="${{ secrets.BACKEND_TABLE }}"
+          REGION="${{ secrets.AWS_REGION || 'us-east-1' }}"
 
           echo "Eliminando tabla DynamoDB (si existe)..."
           if aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
