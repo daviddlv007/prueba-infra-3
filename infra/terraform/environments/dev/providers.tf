@@ -9,9 +9,7 @@ terraform {
   }
 
   backend "s3" {
-    # Estos valores se inyectan via CLI en el workflow
-    encrypt        = true
-    dynamodb_table = "terraform-state-lock"
+
   }
 }
 
