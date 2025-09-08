@@ -32,3 +32,10 @@ output "bucket_exists" {
     length(data.aws_s3_bucket.existing) > 0 ? true : false
   ) : false
 }
+
+output "table_exists" {
+  description = "Whether the DynamoDB table exists"
+  value = var.import_existing ? (
+    length(data.aws_dynamodb_table.existing) > 0 ? true : false
+  ) : false
+}
