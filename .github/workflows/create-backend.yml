@@ -1,7 +1,20 @@
-name: Crear backend S3 + DynamoDB (idempotente, manual)
+name: Crear Backend S3 + DynamoDB
 
 on:
   workflow_dispatch:
+    inputs:
+      project_name:
+        description: 'Nombre del proyecto'
+        required: false
+      aws_region:
+        description: 'Región AWS'
+        required: false
+      bucket_name:
+        description: 'Bucket S3 (opcional, generado automáticamente si vacío)'
+        required: false
+      table_name:
+        description: 'Tabla DynamoDB (opcional, generada automáticamente si vacía)'
+        required: false
 
 permissions:
   contents: read
@@ -15,15 +28,16 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} # opcional
-          aws-region: us-east-1
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ github.event.inputs.aws_region || 'us-east-1' }}
 
-      - name: Crear bucket S3 y tabla DynamoDB (idempotente)
+      - name: Crear bucket S3 y tabla DynamoDB
         run: |
           set -euo pipefail
-          BUCKET="prueba-infra-3-dev-7f3a2c"
-          REGION="us-east-1"
-          TABLE="terraform-state-lock"
+          PROJECT="${{ github.event.inputs.project_name || 'prueba-infra-3' }}"
+          REGION="${{ github.event.inputs.aws_region || 'us-east-1' }}"
+          BUCKET="${{ github.event.inputs.bucket_name || format('%s-%s-backend', PROJECT, github.repository) }}"
+          TABLE="${{ github.event.inputs.table_name || 'terraform-state-lock' }}"
 
           echo "Verificando bucket S3..."
           if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
@@ -55,4 +69,4 @@ jobs:
             echo "Tabla DynamoDB creada"
           fi
 
-          echo "Listo. Backend disponible."
+          echo "Backend listo."

@@ -19,8 +19,8 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} # opcional
-          aws-region: us-east-1
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ github.event.inputs.aws_region || 'us-east-1' }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
@@ -28,56 +28,9 @@ jobs:
           terraform_version: "1.6.0"
 
       - name: Terraform Init
-        working-directory: infra/terraform/environments/dev
-        run: terraform init -input=false
+        run: terraform init -input=false -backend-config="bucket=${{ github.event.inputs.bucket_name || format('%s-%s-backend', github.event.inputs.project_name || 'prueba-infra-3', github.repository) }}" -backend-config="region=${{ github.event.inputs.aws_region || 'us-east-1' }}" 
+        working-directory: infra/terraform
 
-      - name: Terraform Destroy Resources
-        run: |
-          set -euo pipefail
-          TABLE="terraform-state-lock"
-          WORKDIR="infra/terraform/environments/dev"
-
-          # Verificar si la tabla DynamoDB existe
-          if aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
-            echo "Tabla DynamoDB encontrada. Ejecutando terraform destroy con lock..."
-            cd "$WORKDIR"
-            terraform destroy -auto-approve -input=false -lock=true
-          else
-            echo "Tabla DynamoDB no encontrada. Ejecutando terraform destroy sin lock..."
-            cd "$WORKDIR"
-            terraform destroy -auto-approve -input=false -lock=false
-          fi
-
-
-      - name: Cleanup Backend (S3 + DynamoDB)
-        run: |
-          set -euo pipefail
-          BUCKET="prueba-infra-3-dev-7f3a2c"
-          TABLE="terraform-state-lock"
-          REGION="us-east-1"
-
-          echo "Eliminando tabla DynamoDB (si existe)..."
-          if aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
-            aws dynamodb delete-table --table-name "$TABLE" --region "$REGION"
-            echo "Tabla DynamoDB eliminada."
-          else
-            echo "Tabla DynamoDB no existe."
-          fi
-
-          echo "Eliminando bucket S3 y contenido (si existe, manejando versioning)..."
-          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-            # Eliminar todas las versiones y delete markers
-            aws s3api list-object-versions --bucket "$BUCKET" --output=json | \
-            jq -r '.Versions[]?, .DeleteMarkers[]? | "\(.Key):\(.VersionId)"' | \
-            while IFS=: read key version; do
-              aws s3api delete-object --bucket "$BUCKET" --key "$key" --version-id "$version"
-            done
-
-            # Ahora sí eliminar el bucket
-            aws s3api delete-bucket --bucket "$BUCKET" --region "$REGION"
-            echo "Bucket S3 eliminado."
-          else
-            echo "Bucket S3 no existe."
-          fi
-
-          echo "Cleanup total completado."
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve -input=false
+        working-directory: infra/terraform
