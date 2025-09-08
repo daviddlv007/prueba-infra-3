@@ -7,6 +7,15 @@ terraform {
       version = ">= 4.0"
     }
   }
+
+  backend "s3" {
+    bucket         = "REPLACE_ME_BUCKET"       # Se reemplaza con -backend-config
+    key            = "terraform.tfstate"
+    region         = "us-east-1"              # Se reemplaza con -backend-config
+    dynamodb_table = "REPLACE_ME_TABLE"       # Se reemplaza con -backend-config
+    encrypt        = true
+  }
+  
 }
 
 provider "aws" {
@@ -27,3 +36,5 @@ resource "aws_instance" "this" {
     Name = "${var.project_name}-ec2"
   }
 }
+
+
