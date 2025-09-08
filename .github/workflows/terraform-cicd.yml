@@ -21,6 +21,10 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     environment: production
+    env:
+      TF_BUCKET: ${{ secrets.BACKEND_BUCKET }}
+      TF_TABLE: ${{ secrets.BACKEND_TABLE }}
+      TF_REGION: ${{ github.event.inputs.aws_region || 'us-east-1' }}
 
     steps:
       - name: Checkout
@@ -32,7 +36,18 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ github.event.inputs.aws_region || 'us-east-1' }}
+          aws-region: ${{ env.TF_REGION }}
+
+      - name: Validar backend remoto existe
+        run: |
+          if ! aws s3api head-bucket --bucket "$TF_BUCKET" 2>/dev/null; then
+            echo "ERROR: Bucket S3 $TF_BUCKET no existe. Ejecuta create-backend primero."
+            exit 1
+          fi
+          if ! aws dynamodb describe-table --table-name "$TF_TABLE" >/dev/null 2>&1; then
+            echo "ERROR: Tabla DynamoDB $TF_TABLE no existe. Ejecuta create-backend primero."
+            exit 1
+          fi
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
@@ -40,12 +55,13 @@ jobs:
           terraform_version: "1.6.0"
 
       - name: Terraform Init
-        run: terraform init \
-              -backend-config="bucket=${{ secrets.BACKEND_BUCKET }}" \
-              -backend-config="region=${{ github.event.inputs.aws_region || 'us-east-1' }}" \
-              -backend-config="key=terraform.tfstate" \
-              -backend-config="dynamodb_table=${{ secrets.BACKEND_TABLE }}" \
-              -reconfigure
+        run: |
+          terraform init \
+            -backend-config="bucket=$TF_BUCKET" \
+            -backend-config="region=$TF_REGION" \
+            -backend-config="key=terraform.tfstate" \
+            -backend-config="dynamodb_table=$TF_TABLE" \
+            -reconfigure
         working-directory: infra/terraform
 
       - name: Terraform Validate
@@ -53,11 +69,7 @@ jobs:
         working-directory: infra/terraform
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan -input=false \
-              -var="backend_bucket=${{ secrets.BACKEND_BUCKET }}" \
-              -var="backend_table=${{ secrets.BACKEND_TABLE }}" \
-              -var="aws_region=${{ github.event.inputs.aws_region || 'us-east-1' }}" \
-              -var="project_name=${{ github.event.inputs.project_name || 'prueba-infra-3' }}"
+        run: terraform plan -out=tfplan -input=false
         working-directory: infra/terraform
 
       - name: Terraform Apply
