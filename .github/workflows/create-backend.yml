@@ -1,4 +1,4 @@
-name: Crear Backend S3 y DynamoDB
+name: Crear Backend
 
 on:
   workflow_dispatch:
@@ -34,14 +34,20 @@ jobs:
       - name: Crear bucket S3 y tabla DynamoDB
         run: |
           set -euo pipefail
+
+          # Variables desde inputs de workflow o valores por defecto
           PROJECT="${{ github.event.inputs.project_name || 'prueba-infra-3' }}"
           REGION="${{ github.event.inputs.aws_region || 'us-east-1' }}"
-          BUCKET="${{ github.event.inputs.bucket_name || '' }}"
+          BUCKET_INPUT="${{ github.event.inputs.bucket_name || '' }}"
           TABLE="${{ github.event.inputs.table_name || 'terraform-state-lock' }}"
 
-          # Si no se pasó bucket_name, se construye en Bash
-          if [ -z "$BUCKET" ]; then
-            BUCKET="${PROJECT}-${GITHUB_REPOSITORY}-backend"
+          # Construir nombre de bucket válido si no se pasó
+          if [ -z "$BUCKET_INPUT" ]; then
+            SAFE_REPO="${GITHUB_REPOSITORY//\//-}"          # reemplaza '/' por '-'
+            BUCKET="${PROJECT}-${SAFE_REPO}-backend"
+            BUCKET=$(echo "$BUCKET" | tr '[:upper:]' '[:lower:]')  # forzar minúsculas
+          else
+            BUCKET="$BUCKET_INPUT"
           fi
 
           echo "Verificando bucket S3..."
@@ -52,11 +58,19 @@ jobs:
             if [ "$REGION" = "us-east-1" ]; then
               aws s3api create-bucket --bucket "$BUCKET" --region "$REGION"
             else
-              aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" --create-bucket-configuration LocationConstraint=$REGION
+              aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" \
+                --create-bucket-configuration LocationConstraint=$REGION
             fi
-            aws s3api put-bucket-encryption --bucket "$BUCKET" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
-            aws s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled
-            aws s3api put-public-access-block --bucket "$BUCKET" --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+            aws s3api put-bucket-encryption --bucket "$BUCKET" \
+              --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+
+            aws s3api put-bucket-versioning --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+
+            aws s3api put-public-access-block --bucket "$BUCKET" \
+              --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
             echo "Bucket creado y endurecido"
           fi
 
