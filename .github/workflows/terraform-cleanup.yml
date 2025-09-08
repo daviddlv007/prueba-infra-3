@@ -50,9 +50,16 @@ jobs:
             echo "Tabla DynamoDB no existe."
           fi
 
-          echo "Eliminando bucket S3 y contenido (si existe)..."
+          echo "Eliminando bucket S3 y contenido (si existe, manejando versioning)..."
           if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-            aws s3 rm s3://"$BUCKET" --recursive
+            # Eliminar todas las versiones y delete markers
+            aws s3api list-object-versions --bucket "$BUCKET" --output=json | \
+            jq -r '.Versions[]?, .DeleteMarkers[]? | "\(.Key):\(.VersionId)"' | \
+            while IFS=: read key version; do
+              aws s3api delete-object --bucket "$BUCKET" --key "$key" --version-id "$version"
+            done
+
+            # Ahora sí eliminar el bucket
             aws s3api delete-bucket --bucket "$BUCKET" --region "$REGION"
             echo "Bucket S3 eliminado."
           else
