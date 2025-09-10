@@ -164,8 +164,9 @@ jobs:
 
       # Crear/actualizar secrets EC2 usando PAT
       - name: Crear/actualizar secrets EC2 usando PAT
-        if: ${{ steps.ec2-debug.outputs.ec2_host && steps.ec2-debug.outputs.ec2_host != '' }}
+        env:
           GH_TOKEN: ${{ secrets.PA_TOKEN }}
+        if: ${{ steps.ec2-debug.outputs.ec2_host && steps.ec2-debug.outputs.ec2_host != '' }}
         run: |
           set -euo pipefail
           if ! command -v gh >/dev/null 2>&1; then
