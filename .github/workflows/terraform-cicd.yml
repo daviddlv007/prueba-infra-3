@@ -162,32 +162,27 @@ jobs:
         shell: bash
 
 
-
-
-
-      # ------------------------------
-      # (SIMPLIFICADO) Crear secrets con PAT (gh)
-      # ------------------------------
+      # Crear/actualizar secrets EC2 usando PAT
       - name: Crear/actualizar secrets EC2 usando PAT
-        if: ${{ steps.ec2-vars.outputs.ec2_host }}   # ejecuta sólo si hay IP pública
+        if: ${{ steps.ec2-debug.outputs.ec2_host != '' }}  # solo si hay IP pública
         env:
           GH_TOKEN: ${{ secrets.PA_TOKEN }}
         run: |
           set -euo pipefail
-          # Instalar gh si no existe (minimizar riesgo en distintos runners)
           if ! command -v gh >/dev/null 2>&1; then
             sudo apt-get update -y
             sudo apt-get install -y gh
           fi
-
           echo "Creando/actualizando secrets en GitHub..."
-          gh secret set EC2_USER --body "${{ steps.ec2-vars.outputs.ec2_user }}"
-          gh secret set EC2_HOST --body "${{ steps.ec2-vars.outputs.ec2_host }}"
+          gh secret set EC2_USER --body "${{ steps.ec2-debug.outputs.ec2_user }}"
+          gh secret set EC2_HOST --body "${{ steps.ec2-debug.outputs.ec2_host }}"
           echo "Secrets EC2_USER y EC2_HOST creados/actualizados."
         shell: bash
 
+      # No crear secrets (si no existe instancia)
       - name: No crear secrets (si no existe instancia)
-        if: ${{ ! steps.ec2-vars.outputs.ec2_host }}
+        if: ${{ steps.ec2-debug.outputs.ec2_host == '' }}
         run: |
           echo "No se detectó IP pública (instance_ip). No se crearon secrets EC2."
         shell: bash
+
