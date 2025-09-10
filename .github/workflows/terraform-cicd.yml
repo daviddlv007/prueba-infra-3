@@ -78,9 +78,11 @@ jobs:
         working-directory: infra/terraform
         shell: bash
 
-      - name: Terraform Refresh
-        run: terraform refresh
+      - name: Terraform State List
         working-directory: infra/terraform
+        run: |
+          echo "Listando recursos en el state remoto:"
+          terraform state list || echo "No hay recursos en el state"
 
 
       - name: Terraform Validate
