@@ -78,13 +78,6 @@ jobs:
         working-directory: infra/terraform
         shell: bash
 
-      - name: Terraform State List
-        working-directory: infra/terraform
-        run: |
-          echo "Listando recursos en el state remoto:"
-          terraform state list || echo "No hay recursos en el state"
-
-
       - name: Terraform Validate
         run: terraform validate
         working-directory: infra/terraform
@@ -100,6 +93,67 @@ jobs:
         run: terraform apply -input=false -auto-approve tfplan
         working-directory: infra/terraform
         shell: bash
+
+      - name: Debug EC2_USER y EC2_HOST
+        working-directory: infra/terraform
+        run: |
+          #!/bin/bash
+          set -euo pipefail
+
+          echo "=== Directorio actual ==="
+          pwd
+          echo "=== Listando recursos en el state ==="
+          terraform state list || true
+
+          echo "=== Intentando obtener aws_instance.this ==="
+          terraform state show aws_instance.this || true
+
+          # IP pública desde output
+          EC2_HOST=$(terraform output -raw instance_ip 2>/dev/null || true)
+          echo "Output instance_ip: '$EC2_HOST'"
+
+          # Fallback desde state si el output falla
+          if [ -z "$EC2_HOST" ]; then
+            echo "Output vació, intentando desde state..."
+            EC2_HOST=$(terraform state show aws_instance.this 2>/dev/null | sed -n 's/^public_ip *= *"\(.*\)"/\1/p' || true)
+            echo "IP pública desde state: '$EC2_HOST'"
+          fi
+
+          # AMI
+          AMI_ID=$(terraform state show aws_instance.this 2>/dev/null | sed -n 's/^ami *= *"\(.*\)"/\1/p' || true)
+          echo "AMI_ID: '$AMI_ID'"
+
+          # AWS_REGION
+          AWS_REGION="${{ github.event.inputs.aws_region || secrets.AWS_REGION || 'us-east-1' }}"
+          echo "AWS_REGION: $AWS_REGION"
+
+          # Obtener EC2_USER desde tag 'User'
+          EC2_USER=$(aws ec2 describe-images --image-ids "${AMI_ID:-}" --region "$AWS_REGION" \
+            --query 'Images[0].Tags[?Key==`User`].Value' --output text 2>/dev/null || true)
+          echo "Usuario desde tag 'User': '$EC2_USER'"
+
+          # Inferir por nombre de la AMI
+          if [ -z "${EC2_USER:-}" ] || [ "${EC2_USER:-}" = "None" ]; then
+            ami_name=$(aws ec2 describe-images --image-ids "${AMI_ID:-}" --region "$AWS_REGION" \
+              --query 'Images[0].Name' --output text 2>/dev/null || true)
+            ami_name_lc=$(echo "${ami_name:-}" | tr '[:upper:]' '[:lower:]' || true)
+            case "$ami_name_lc" in
+              *ubuntu*) EC2_USER="ubuntu" ;;
+              *amazon*|*amazon-linux*|*amazonlinux*) EC2_USER="ec2-user" ;;
+              *debian*) EC2_USER="admin" ;;
+              *centos*) EC2_USER="centos" ;;
+              *windows*) EC2_USER="Administrator" ;;
+              *) EC2_USER="ec2-user" ;;
+            esac
+            echo "Usuario inferido por AMI: '$EC2_USER'"
+          fi
+
+          # Exportar outputs
+          echo "ec2_user=$EC2_USER" >> "$GITHUB_OUTPUT"
+          echo "ec2_host=$EC2_HOST" >> "$GITHUB_OUTPUT"
+
+          echo "Final: EC2_USER='$EC2_USER', EC2_HOST='$EC2_HOST'"
+
 
       # ------------------------------
       # (SIMPLIFICADO) Obtener EC2_USER y EC2_HOST
