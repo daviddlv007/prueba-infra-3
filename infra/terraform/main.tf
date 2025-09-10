@@ -29,12 +29,12 @@ data "aws_vpc" "default" {
 # --- Security Group MVP ---
 resource "aws_security_group" "mvp_sg" {
   name        = "${var.project_name}-sg"
-  description = "SG MVP: SSH, HTTP, HTTPS abiertos"
+  description = "SG MVP: SSH HTTP HTTPS abiertos"
   vpc_id      = data.aws_vpc.default.id
 
   # SSH abierto
   ingress {
-    description = "SSH público"
+    description = "SSH open"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -43,7 +43,7 @@ resource "aws_security_group" "mvp_sg" {
 
   # HTTP público
   ingress {
-    description = "HTTP público"
+    description = "HTTP open"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -52,7 +52,7 @@ resource "aws_security_group" "mvp_sg" {
 
   # HTTPS público
   ingress {
-    description = "HTTPS público"
+    description = "HTTPS open"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -71,6 +71,7 @@ resource "aws_security_group" "mvp_sg" {
     Name = "${var.project_name}-sg"
   }
 }
+
 
 # --- EC2 usando el SG MVP ---
 resource "aws_instance" "this" {
