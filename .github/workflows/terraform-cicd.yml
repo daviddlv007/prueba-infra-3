@@ -94,50 +94,31 @@ jobs:
         working-directory: infra/terraform
         shell: bash
 
-      - name: Obtener EC2_USER y EC2_HOST con debug
+      - name: Obtener EC2_USER y EC2_HOST con debug mejorado
         id: ec2-vars
         working-directory: infra/terraform
         run: |
           #!/bin/bash
           set -euo pipefail
 
-          echo "=== Directorio actual ==="
-          pwd
-
-          echo "=== Terraform init (reconfigurando backend) ==="
-          terraform init \
-            -backend-config="bucket=$TF_BUCKET" \
-            -backend-config="region=$TF_REGION" \
-            -backend-config="key=terraform.tfstate" \
-            -backend-config="dynamodb_table=$TF_TABLE" \
-            -reconfigure
-
-          echo "=== Forzando refresh del state ==="
-          terraform refresh -input=false || true
-
-          echo "=== Imprimiendo state remoto (state pull) ==="
-          terraform state pull > state.json
-          echo "=== Contenido state.json ==="
-          cat state.json
-
           echo "=== Listando recursos en el state ==="
-          terraform state list || true
+          terraform state list > state_list.txt
+          cat -v state_list.txt   # muestra caracteres invisibles como ^M
 
-          if ! terraform state list 2>/dev/null | grep -q '^aws_instance.this$'; then
+          if ! grep -q '^aws_instance.this$' state_list.txt; then
             echo "No hay aws_instance.this en el state. No se generarán secrets."
             echo "ec2_user=" >> "$GITHUB_OUTPUT"
             echo "ec2_host=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "=== Intentando obtener aws_instance.this ==="
-          terraform state show aws_instance.this || true
+          echo "aws_instance.this encontrado en el state ✅"
 
-          # Obtener IP pública (output explícito)
+          # IP pública
           EC2_HOST=$(terraform output -raw instance_ip 2>/dev/null || true)
           echo "IP pública detectada: '$EC2_HOST'"
 
-          # Obtener AMI desde el state
+          # AMI desde el state
           AMI_ID=$(terraform state show -no-color aws_instance.this 2>/dev/null \
                   | sed -n 's/^ami *= *"\(.*\)"/\1/p' || true)
           echo "AMI_ID detectada: '$AMI_ID'"
@@ -146,12 +127,12 @@ jobs:
           AWS_REGION="${{ github.event.inputs.aws_region || secrets.AWS_REGION || 'us-east-1' }}"
           echo "Región AWS usada: $AWS_REGION"
 
-          # Intentar obtener usuario desde tag 'User'
+          # Usuario desde tag 'User'
           EC2_USER=$(aws ec2 describe-images --image-ids "${AMI_ID:-}" --region "$AWS_REGION" \
             --query 'Images[0].Tags[?Key==`User`].Value' --output text 2>/dev/null || true)
           echo "Usuario desde tag 'User': '$EC2_USER'"
 
-          # Si no existe tag 'User', inferir por nombre de la AMI
+          # Inferir usuario si no hay tag
           if [ -z "${EC2_USER:-}" ] || [ "${EC2_USER:-}" = "None" ]; then
             ami_name=$(aws ec2 describe-images --image-ids "${AMI_ID:-}" --region "$AWS_REGION" \
                         --query 'Images[0].Name' --output text 2>/dev/null || true)
@@ -174,6 +155,7 @@ jobs:
           echo "ec2_user=${EC2_USER:-ec2-user}" >> "$GITHUB_OUTPUT"
           echo "ec2_host=${EC2_HOST:-}" >> "$GITHUB_OUTPUT"
         shell: bash
+
 
 
       # ------------------------------
