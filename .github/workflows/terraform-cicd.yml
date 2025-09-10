@@ -103,7 +103,7 @@ jobs:
 
           echo "=== Listando recursos en el state ==="
           terraform state list > state_list.txt
-          cat -v state_list.txt   # muestra caracteres invisibles como ^M
+          cat -v state_list.txt
 
           if ! grep -q '^aws_instance.this$' state_list.txt; then
             echo "No hay aws_instance.this en el state. No se generarán secrets."
@@ -114,8 +114,8 @@ jobs:
 
           echo "aws_instance.this encontrado en el state ✅"
 
-          # IP pública
-          EC2_HOST=$(terraform output -raw instance_ip 2>/dev/null || true)
+          # IP pública usando output JSON para evitar contaminación de logs
+          EC2_HOST=$(terraform output -json instance_ip 2>/dev/null | jq -r '.')
           echo "IP pública detectada: '$EC2_HOST'"
 
           # AMI desde el state
@@ -155,6 +155,7 @@ jobs:
           echo "ec2_user=${EC2_USER:-ec2-user}" >> "$GITHUB_OUTPUT"
           echo "ec2_host=${EC2_HOST:-}" >> "$GITHUB_OUTPUT"
         shell: bash
+
 
 
 
