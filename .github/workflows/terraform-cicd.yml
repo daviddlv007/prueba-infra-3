@@ -104,6 +104,14 @@ jobs:
           #!/bin/bash
           set -euo pipefail
 
+          # Inicializar Terraform para asegurar que el backend remoto esté disponible
+          terraform init \
+            -backend-config="bucket=${TF_BUCKET}" \
+            -backend-config="region=${TF_REGION}" \
+            -backend-config="key=terraform.tfstate" \
+            -backend-config="dynamodb_table=${TF_TABLE}" \
+            -reconfigure
+
           # Si no hay recurso aws_instance.this en el state -> salir con outputs vacíos
           if ! terraform state list 2>/dev/null | grep -q '^aws_instance.this$'; then
             echo "No hay aws_instance.this en el state. No se generarán secrets."
