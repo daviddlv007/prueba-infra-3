@@ -1,0 +1,35 @@
+{$DOMAIN} {
+    encode zstd gzip
+
+    handle /static/* {
+        root * /srv
+        uri strip_prefix /static
+        file_server
+    }
+
+
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy backend:8000
+    }
+
+    handle /admin/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /healthz* {
+        reverse_proxy backend:8000
+    }
+
+    route {
+        try_files {path} /index.html
+        file_server {
+            root /srv
+        }
+        header Cache-Control "public, max-age=3600"
+    }
+
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+    }
+}
