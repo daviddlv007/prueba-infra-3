@@ -112,23 +112,21 @@ jobs:
 
           echo "=== Directorio de trabajo ==="
           pwd
-
           echo "=== Terraform state list ==="
           terraform state list || true
 
-          # Obtener IP desde output JSON
-          EC2_HOST=$(terraform output -raw instance_ip 2>/dev/null || terraform output -json instance_ip 2>/dev/null | jq -r '.value // empty')
+          # IP directamente desde Terraform output
+          EC2_HOST=$(terraform output -raw instance_ip 2>/dev/null || echo "")
           echo "EC2_HOST='$EC2_HOST'"
 
           # Obtener AMI desde state
           AMI_ID=$(terraform state show -no-color aws_instance.this 2>/dev/null | sed -n 's/^[[:space:]]*ami *= *"\(.*\)"/\1/p')
           echo "AMI_ID='$AMI_ID'"
 
-          # Determinar usuario por AMI
+          # Determinar usuario por AMI (tag 'User' o nombre)
           EC2_USER=$(aws ec2 describe-images --image-ids "$AMI_ID" --region "${AWS_REGION:-us-east-1}" \
                         --query 'Images[0].Tags[?Key==`User`].Value' --output text 2>/dev/null || true)
 
-          # Fallback simple basado en nombre de AMI si no hay tag
           if [ -z "$EC2_USER" ] || [ "$EC2_USER" = "None" ]; then
             ami_name=$(aws ec2 describe-images --image-ids "$AMI_ID" --region "${AWS_REGION:-us-east-1}" \
                           --query 'Images[0].Name' --output text 2>/dev/null || true)
