@@ -32,16 +32,16 @@ jobs:
 
             echo "=== Agregando usuario al grupo docker ==="
             sudo usermod -aG docker $USER
+            newgrp docker
 
             echo "=== Instalando Docker Compose v2 ==="
-            DOCKER_COMPOSE_VERSION="v2.20.2"  # Última estable 2025
-            sudo curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-            docker-compose version
+            DOCKER_COMPOSE_VERSION="v2.20.2"
+            sudo curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+            sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
             echo "=== Verificando instalaciones ==="
             git --version
             docker --version
-            docker-compose --version
+            docker compose version  # notar sin guion medio
 
             echo "=== Bootstrap completo ==="
