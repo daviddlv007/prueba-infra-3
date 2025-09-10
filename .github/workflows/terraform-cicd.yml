@@ -93,3 +93,81 @@ jobs:
         run: terraform apply -input=false -auto-approve tfplan
         working-directory: infra/terraform
         shell: bash
+
+      # ------------------------------
+      # (SIMPLIFICADO) Obtener EC2_USER y EC2_HOST
+      # ------------------------------
+      - name: Obtener EC2_USER y EC2_HOST
+        id: ec2-vars
+        working-directory: infra/terraform
+        run: |
+          #!/bin/bash
+          set -euo pipefail
+
+          # Si no hay recurso aws_instance.this en el state -> salir con outputs vacíos
+          if ! terraform state list 2>/dev/null | grep -q '^aws_instance.this$'; then
+            echo "No hay aws_instance.this en el state. No se generarán secrets."
+            echo "ec2_user=" >> "$GITHUB_OUTPUT"
+            echo "ec2_host=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # IP pública (output explícito)
+          EC2_HOST=$(terraform output -raw instance_ip 2>/dev/null || true)
+
+          # AMI desde el state (la instancia creada por Terraform)
+          AMI_ID=$(terraform state show -no-color aws_instance.this 2>/dev/null | sed -n 's/^ami *= *"\(.*\)"/\1/p' || true)
+
+          # Región (misma lógica que usas en el job)
+          AWS_REGION="${{ github.event.inputs.aws_region || secrets.AWS_REGION || 'us-east-1' }}"
+
+          # Intentar obtener usuario desde tag 'User'
+          EC2_USER=$(aws ec2 describe-images --image-ids "${AMI_ID:-}" --region "$AWS_REGION" \
+            --query 'Images[0].Tags[?Key==`User`].Value' --output text 2>/dev/null || true)
+
+          # Si no existe tag 'User', inferir por nombre de la AMI
+          if [ -z "${EC2_USER:-}" ] || [ "${EC2_USER:-}" = "None" ]; then
+            ami_name=$(aws ec2 describe-images --image-ids "${AMI_ID:-}" --region "$AWS_REGION" \
+              --query 'Images[0].Name' --output text 2>/dev/null || true)
+            ami_name_lc=$(echo "${ami_name:-}" | tr '[:upper:]' '[:lower:]' || true)
+            case "$ami_name_lc" in
+              *ubuntu*) EC2_USER="ubuntu" ;;
+              *amazon*|*amazon-linux*|*amazonlinux*) EC2_USER="ec2-user" ;;
+              *debian*) EC2_USER="admin" ;;
+              *centos*) EC2_USER="centos" ;;
+              *windows*) EC2_USER="Administrator" ;;
+              *) EC2_USER="ec2-user" ;;
+            esac
+          fi
+
+          # Exportar outputs para GitHub Actions
+          echo "ec2_user=${EC2_USER:-ec2-user}" >> "$GITHUB_OUTPUT"
+          echo "ec2_host=${EC2_HOST:-}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      # ------------------------------
+      # (SIMPLIFICADO) Crear secrets con PAT (gh)
+      # ------------------------------
+      - name: Crear/actualizar secrets EC2 usando PAT
+        if: ${{ steps.ec2-vars.outputs.ec2_host }}   # ejecuta sólo si hay IP pública
+        env:
+          GH_TOKEN: ${{ secrets.PA_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Instalar gh si no existe (minimizar riesgo en distintos runners)
+          if ! command -v gh >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y gh
+          fi
+
+          echo "Creando/actualizando secrets en GitHub..."
+          gh secret set EC2_USER --body "${{ steps.ec2-vars.outputs.ec2_user }}"
+          gh secret set EC2_HOST --body "${{ steps.ec2-vars.outputs.ec2_host }}"
+          echo "Secrets EC2_USER y EC2_HOST creados/actualizados."
+        shell: bash
+
+      - name: No crear secrets (si no existe instancia)
+        if: ${{ ! steps.ec2-vars.outputs.ec2_host }}
+        run: |
+          echo "No se detectó IP pública (instance_ip). No se crearon secrets EC2."
+        shell: bash

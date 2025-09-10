@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       project_name:
-        description: 'Nombre del proyecto'
+        description: 'Nombre del proyecto (opcional de momento, hacerlo requerido)'
         required: false
       aws_region:
-        description: 'Región AWS'
+        description: 'Región AWS (opcional, "us-east-1" automáticamente si vacío)' 
         required: false
       bucket_name:
         description: 'Bucket S3 (opcional, generado automáticamente si vacío)'
