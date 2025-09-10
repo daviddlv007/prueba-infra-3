@@ -94,6 +94,59 @@ jobs:
         working-directory: infra/terraform
         shell: bash
 
+      - name: Debug completo de EC2_USER y EC2_HOST
+        id: ec2-debug
+        working-directory: infra/terraform
+        run: |
+          #!/bin/bash
+          set -euo pipefail
+
+          echo "=== Directorio actual ==="
+          pwd
+
+          echo "=== Terraform init y refresh ==="
+          terraform init -backend-config="bucket=${TF_BUCKET}" \
+                        -backend-config="region=${TF_REGION}" \
+                        -backend-config="key=terraform.tfstate" \
+                        -backend-config="dynamodb_table=${TF_TABLE}" \
+                        -reconfigure
+          terraform refresh -input=false
+
+          echo "=== Terraform state list ==="
+          terraform state list
+
+          echo "=== Terraform state show aws_instance.this ==="
+          terraform state show aws_instance.this || echo "(no se encontró aws_instance.this)"
+
+          echo "=== Terraform state pull (json completo) ==="
+          terraform state pull || echo "(no se pudo hacer state pull)"
+
+          echo "=== Terraform outputs ==="
+          terraform output || echo "(no hay outputs)"
+          terraform output -json || echo "(no hay outputs en JSON)"
+          terraform output -raw instance_ip || echo "(no se pudo obtener instance_ip crudo)"
+
+          echo "=== Obtener AMI desde el state ==="
+          AMI_ID=$(terraform state show -no-color aws_instance.this 2>/dev/null | sed -n 's/^ami *= *"\(.*\)"/\1/p' || echo "")
+          echo "AMI_ID: '$AMI_ID'"
+
+          echo "=== Obtener usuario desde AWS CLI ==="
+          aws ec2 describe-images --image-ids "$AMI_ID" --region "$TF_REGION" \
+              --query 'Images[0].Tags' --output json || echo "(no se pudo obtener tags de la AMI)"
+
+          echo "=== Obtener nombre de la AMI ==="
+          aws ec2 describe-images --image-ids "$AMI_ID" --region "$TF_REGION" \
+              --query 'Images[0].Name' --output text || echo "(no se pudo obtener nombre de la AMI)"
+
+          echo "=== Obtener public IP de la instancia (raw) ==="
+          terraform output -raw instance_ip || echo "(no se pudo obtener instance_ip crudo)"
+          
+          echo "=== Exportando para GH Actions (raw) ==="
+          echo "ec2_user=" >> "$GITHUB_OUTPUT"
+          echo "ec2_host=" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+
       - name: Obtener EC2_USER y EC2_HOST (debug extendido)
         id: ec2-vars
         working-directory: infra/terraform
