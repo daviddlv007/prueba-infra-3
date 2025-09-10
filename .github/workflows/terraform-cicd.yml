@@ -117,7 +117,7 @@ jobs:
           terraform state list || true
 
           # Obtener IP desde output JSON
-          EC2_HOST=$(terraform output -json instance_ip 2>/dev/null | jq -r '.value // empty')
+          EC2_HOST=$(terraform output -raw instance_ip 2>/dev/null || terraform output -json instance_ip 2>/dev/null | jq -r '.value // empty')
           echo "EC2_HOST='$EC2_HOST'"
 
           # Obtener AMI desde state
