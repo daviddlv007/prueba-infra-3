@@ -1,8 +1,10 @@
-ENV_FILE=../.env
+# Variables
+ENV_FILE=../../.env
 COMPOSE_FILE=docker-compose.dev.yml
-COMPOSE_CMD=docker-compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE)
+COMPOSE_CMD=docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE)
 
-include ../.env
+# Exporta variables del env
+include ../../.env
 export
 
 # Levanta todos los contenedores en modo desarrollo
@@ -32,5 +34,3 @@ restart: down up
 show-urls:
 	@echo "Frontend: http://localhost:$(FRONTEND_PORT)"
 	@echo "Backend:  http://localhost:$(BACKEND_PORT)/admin/"
-
-

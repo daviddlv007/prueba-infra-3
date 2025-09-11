@@ -1,3 +1,3 @@
-# Makefile raíz - puente a infra/
+# Makefile raíz - puente a /compose
 %:
-	$(MAKE) -C infra $@
+	$(MAKE) -C infra/compose $@

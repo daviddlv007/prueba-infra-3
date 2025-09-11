@@ -97,7 +97,7 @@ jobs:
             fi
 
             # Ir a infra para despliegue
-            cd "$REPO_DIR/infra"
+            cd "$REPO_DIR/infra/compose"
 
             FRONTEND_IMAGE="ghcr.io/${{ github.repository }}/frontend"
             BACKEND_IMAGE="ghcr.io/${{ github.repository }}/backend"

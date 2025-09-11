@@ -42,7 +42,7 @@ services:
     environment:
       - DOMAIN=${DOMAIN}
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - static_volume:/srv:ro
       - caddy_data:/data
       - caddy_config:/config
