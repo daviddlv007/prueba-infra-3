@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 
 # Paths
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Seguridad
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-secret-key")
@@ -21,6 +21,23 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 ]
 
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+]
+
+# Detecta automáticamente las apps en domains/
+DOMAINS_DIR = BASE_DIR / "domains"
+
+for domain in DOMAINS_DIR.iterdir():
+    if domain.is_dir() and (domain / "__init__.py").exists():
+        INSTALLED_APPS.append(f"domains.{domain.name}")
+
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -31,7 +48,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'mi_proyecto.urls'
+ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
     {
@@ -48,7 +65,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'mi_proyecto.wsgi.application'
+WSGI_APPLICATION = 'config.wsgi.application'
 
 # Base de datos se sobreescribe por entorno
 DATABASES = {}

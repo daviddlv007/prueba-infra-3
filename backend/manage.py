@@ -6,7 +6,14 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mi_proyecto.settings')
+    settings_module = os.getenv('DJANGO_SETTINGS_MODULE')
+    if not settings_module:
+        raise RuntimeError(
+            "ERROR: debes definir DJANGO_SETTINGS_MODULE, "
+            "ejemplo: export DJANGO_SETTINGS_MODULE=config.settings.development"
+        )
+    os.environ['DJANGO_SETTINGS_MODULE'] = settings_module
+
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

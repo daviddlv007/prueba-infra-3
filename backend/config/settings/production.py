@@ -4,13 +4,13 @@ import os
 DEBUG = False
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost").split(",")
 
-ROOT_URLCONF = "mi_proyecto.urls"
+ROOT_URLCONF = "config.urls"
 
 # Base de datos productiva (ej: PostgreSQL)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("POSTGRES_DB", "mi_proyecto"),
+        'NAME': os.getenv("POSTGRES_DB", "config"),
         'USER': os.getenv("POSTGRES_USER", "postgres"),
         'PASSWORD': os.getenv("POSTGRES_PASSWORD", ""),
         'HOST': os.getenv("POSTGRES_HOST", "db"),

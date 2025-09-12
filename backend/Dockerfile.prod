@@ -51,7 +51,7 @@ RUN chmod +x /app/entrypoint.sh
 USER app
 
 # Variables de entorno por defecto (ajustables en runtime)
-ENV DJANGO_SETTINGS_MODULE=mi_proyecto.settings.production
+ENV DJANGO_SETTINGS_MODULE=config.settings.production
 ENV PYTHONPATH=/app
 
 # Puerto interno que escucha Gunicorn
