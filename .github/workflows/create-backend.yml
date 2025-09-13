@@ -95,3 +95,29 @@ jobs:
             echo "  BACKEND_TABLE  -> ${{ steps.set-outputs.outputs.table }}"
           fi
 
+
+      - name: Verificar secrets creados
+        run: |
+          set -euo pipefail
+
+          if [ -n "${{ secrets.PA_TOKEN }}" ]; then
+            echo "Verificando secret BACKEND_BUCKET..."
+            ACTUAL_BUCKET=$(GH_TOKEN="${{ secrets.PA_TOKEN }}" gh secret list --json name --jq '.[] | select(.name=="BACKEND_BUCKET") | .name' || echo "")
+            if [ "$ACTUAL_BUCKET" = "BACKEND_BUCKET" ]; then
+              echo "Secret BACKEND_BUCKET existe ✅"
+            else
+              echo "ERROR: Secret BACKEND_BUCKET no encontrado ❌"
+              exit 1
+            fi
+
+            echo "Verificando secret BACKEND_TABLE..."
+            ACTUAL_TABLE=$(GH_TOKEN="${{ secrets.PA_TOKEN }}" gh secret list --json name --jq '.[] | select(.name=="BACKEND_TABLE") | .name' || echo "")
+            if [ "$ACTUAL_TABLE" = "BACKEND_TABLE" ]; then
+              echo "Secret BACKEND_TABLE existe ✅"
+            else
+              echo "ERROR: Secret BACKEND_TABLE no encontrado ❌"
+              exit 1
+            fi
+          else
+            echo "No hay PAT definido, no se puede verificar."
+          fi
