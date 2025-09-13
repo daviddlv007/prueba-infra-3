@@ -80,8 +80,11 @@ jobs:
           echo "table=$TABLE" >> "$GITHUB_OUTPUT"
 
       - name: Crear secrets automáticos con PAT (si existe)
+        env:
+          GH_TOKEN: ${{ secrets.PA_TOKEN }}
         run: |
-          if [ -n "${{ secrets.PA_TOKEN }}" ]; then
+          set -euo pipefail
+          if [ -n "$GH_TOKEN" ]; then
             echo "Creando secret BACKEND_BUCKET..."
             gh secret set BACKEND_BUCKET --body "${{ steps.set-outputs.outputs.bucket }}"
             echo "Creando secret BACKEND_TABLE..."
@@ -90,5 +93,5 @@ jobs:
             echo "No hay PAT definido, copia los outputs manualmente para crear los secrets:"
             echo "  BACKEND_BUCKET -> ${{ steps.set-outputs.outputs.bucket }}"
             echo "  BACKEND_TABLE  -> ${{ steps.set-outputs.outputs.table }}"
-        env:
-          GH_TOKEN: ${{ secrets.PA_TOKEN }}
+          fi
+
