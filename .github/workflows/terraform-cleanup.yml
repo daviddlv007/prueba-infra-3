@@ -12,11 +12,18 @@ jobs:
     env:
       TF_BUCKET: ${{ secrets.BACKEND_BUCKET }}
       TF_TABLE: ${{ secrets.BACKEND_TABLE }}
-      TF_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
+      - name: Leer region desde terraform.tfvars
+        id: read-tfvars
+        run: |
+          set -euo pipefail
+          REGION=$(grep 'aws_region' infra/terraform/terraform.tfvars | awk -F '=' '{print $2}' | tr -d ' "')
+          echo "TF_REGION=${REGION:-us-east-1}" >> "$GITHUB_ENV"
+          echo "Región leída: $REGION"
 
       - name: Validar secrets requeridos
         run: |
