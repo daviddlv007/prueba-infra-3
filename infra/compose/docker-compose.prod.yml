@@ -14,9 +14,6 @@ services:
     env_file:
       - .env
     environment:
-      DJANGO_PROJECT: mi_proyecto
-      DJANGO_APP: mi_app
-      DJANGO_SETTINGS_MODULE: mi_proyecto.settings.production
       DJANGO_ALLOWED_HOSTS: ${DOMAIN}
       POSTGRES_DB: mi_db
       POSTGRES_USER: postgres
