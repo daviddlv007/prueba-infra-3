@@ -1,7 +1,7 @@
 name: Crear Backend
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -31,6 +31,10 @@ jobs:
           aws-region: ${{ env.REGION }}
 
       - name: Crear bucket S3 y tabla DynamoDB
+        env:
+          PROJECT: ${{ env.PROJECT }}
+          REGION: ${{ env.REGION }}
+          PA_TOKEN: ${{ secrets.PA_TOKEN }}
         run: |
           set -euo pipefail
           BUCKET="${PROJECT}-backend"
@@ -60,19 +64,13 @@ jobs:
             echo "Tabla DynamoDB ya existe: $TABLE"
           fi
 
-      - name: Crear secrets automáticos con PAT
-        run: |
-          set -euo pipefail
-
-          # Instalar GitHub CLI si no existe
-          if ! command -v gh >/dev/null 2>&1; then
-            sudo apt-get update -y
-            sudo apt-get install -y gh
-          fi
-
-          # Crear secrets solo si existe PA_TOKEN
-          if [ -n "${{ secrets.PA_TOKEN }}" ]; then
-            export GH_TOKEN="${{ secrets.PA_TOKEN }}"
+          # Crear secrets automáticos con PA_TOKEN si existe
+          if [ -n "$PA_TOKEN" ]; then
+            if ! command -v gh >/dev/null 2>&1; then
+              sudo apt-get update -y
+              sudo apt-get install -y gh
+            fi
+            echo "$PA_TOKEN" | gh auth login --with-token
             gh secret set BACKEND_BUCKET --body "$BUCKET"
             gh secret set BACKEND_TABLE  --body "$TABLE"
             echo "Secrets BACKEND_BUCKET y BACKEND_TABLE creados/actualizados."
