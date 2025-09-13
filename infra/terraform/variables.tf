@@ -1,34 +1,34 @@
 variable "project_name" {
-  type    = string
-  default = "prueba-infra-3"
-}
-
-variable "ami" {
-  type    = string
-  default = "ami-00ca32bbc84273381"
-}
-
-variable "instance_type" {
-  type    = string
-  default = "t2.micro"
-}
-
-variable "key_name" {
-  type    = string
-  default = "dev-key"
-}
-
-variable "volume_size" {
-  type    = number
-  default = 8
-}
-
-variable "volume_type" {
-  type    = string
-  default = "gp3"
+  type        = string
+  description = "Nombre del proyecto"
 }
 
 variable "aws_region" {
-  type    = string
-  default = "us-east-1"
+  type        = string
+  description = "Región AWS"
+}
+
+variable "ami" {
+  type        = string
+  description = "AMI de la instancia"
+}
+
+variable "instance_type" {
+  type        = string
+  description = "Tipo de instancia"
+}
+
+variable "key_name" {
+  type        = string
+  description = "Key pair para EC2"
+}
+
+variable "volume_size" {
+  type        = number
+  description = "Tamaño del volumen"
+}
+
+variable "volume_type" {
+  type        = string
+  description = "Tipo de volumen"
 }

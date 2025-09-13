@@ -1,20 +1,6 @@
 name: Crear Backend
-
 on:
   workflow_dispatch:
-    inputs:
-      project_name:
-        description: 'Nombre del proyecto (opcional de momento, hacerlo requerido)'
-        required: false
-      aws_region:
-        description: 'Región AWS (opcional, "us-east-1" automáticamente si vacío)' 
-        required: false
-      bucket_name:
-        description: 'Bucket S3 (opcional, generado automáticamente si vacío)'
-        required: false
-      table_name:
-        description: 'Tabla DynamoDB (opcional, generada automáticamente si vacía)'
-        required: false
 
 permissions:
   contents: read
@@ -22,13 +8,18 @@ permissions:
 jobs:
   create-backend:
     runs-on: ubuntu-latest
-    outputs:
-      bucket_name: ${{ steps.set-outputs.outputs.bucket }}
-      table_name: ${{ steps.set-outputs.outputs.table }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Leer variables desde terraform.tfvars
+        id: tfvars
+        run: |
+          set -euo pipefail
+          PROJECT=$(grep 'project_name' infra/terraform/terraform.tfvars | awk -F '=' '{print $2}' | tr -d ' "')
+          REGION=$(grep 'aws_region' infra/terraform/terraform.tfvars | awk -F '=' '{print $2}' | tr -d ' "')
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+          echo "REGION=$REGION" >> "$GITHUB_ENV"
 
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v2
@@ -36,74 +27,44 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ github.event.inputs.aws_region || 'us-east-1' }}
+          aws-region: ${{ env.REGION }}
 
       - name: Crear bucket S3 y tabla DynamoDB
-        id: set-outputs
         run: |
           set -euo pipefail
+          BUCKET="${PROJECT}-backend"
+          TABLE="terraform-state-lock"
 
-          PROJECT="${{ github.event.inputs.project_name || 'prueba-infra-3' }}"
-          REGION="${{ github.event.inputs.aws_region || 'us-east-1' }}"
-          BUCKET_INPUT="${{ github.event.inputs.bucket_name || '' }}"
-          TABLE="${{ github.event.inputs.table_name || 'terraform-state-lock' }}"
-
-          if [ -z "$BUCKET_INPUT" ]; then
-            SAFE_REPO="${GITHUB_REPOSITORY//\//-}"
-            BUCKET="${PROJECT}-${SAFE_REPO}-backend"
-            BUCKET=$(echo "$BUCKET" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9.-]//g')
-          else
-            BUCKET="$BUCKET_INPUT"
-          fi
-
-          echo "Verificando bucket S3..."
-          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-            echo "Bucket ya existe: $BUCKET"
-          else
-            echo "Creando bucket S3: $BUCKET"
-            if [ "$REGION" = "us-east-1" ]; then
-              aws s3api create-bucket --bucket "$BUCKET" --region "$REGION"
-            else
-              aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" \
-                --create-bucket-configuration LocationConstraint=$REGION
-            fi
-            aws s3api put-bucket-encryption --bucket "$BUCKET" \
-              --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+          # Crear bucket si no existe
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" $( [ "$REGION" != "us-east-1" ] && echo "--create-bucket-configuration LocationConstraint=$REGION" )
+            aws s3api put-bucket-encryption --bucket "$BUCKET" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
             aws s3api put-bucket-versioning --bucket "$BUCKET" --versioning-configuration Status=Enabled
-            aws s3api put-public-access-block --bucket "$BUCKET" \
-              --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
-            echo "Bucket creado y endurecido"
+            aws s3api put-public-access-block --bucket "$BUCKET" --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+            echo "Bucket creado y endurecido: $BUCKET"
+          else
+            echo "Bucket ya existe: $BUCKET"
           fi
 
-          echo "Verificando tabla DynamoDB..."
-          if aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
-            echo "Tabla DynamoDB ya existe: $TABLE"
-          else
-            echo "Creando tabla DynamoDB: $TABLE"
+          # Crear tabla DynamoDB si no existe
+          if ! aws dynamodb describe-table --table-name "$TABLE" >/dev/null 2>&1; then
             aws dynamodb create-table \
               --table-name "$TABLE" \
               --attribute-definitions AttributeName=LockID,AttributeType=S \
               --key-schema AttributeName=LockID,KeyType=HASH \
               --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
               --region "$REGION"
-            echo "Tabla DynamoDB creada"
-          fi
-
-          # Exponer outputs para el job
-          echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
-          echo "table=$TABLE" >> "$GITHUB_OUTPUT"
-
-      - name: Crear secrets automáticos con PAT (si existe)
-        run: |
-          if [ -n "${{ secrets.PA_TOKEN }}" ]; then
-            echo "Creando secret BACKEND_BUCKET..."
-            gh secret set BACKEND_BUCKET --body "${{ steps.set-outputs.outputs.bucket }}"
-            echo "Creando secret BACKEND_TABLE..."
-            gh secret set BACKEND_TABLE --body "${{ steps.set-outputs.outputs.table }}"
+            echo "Tabla DynamoDB creada: $TABLE"
           else
-            echo "No hay PAT definido, copia los outputs manualmente para crear los secrets:"
-            echo "  BACKEND_BUCKET -> ${{ steps.set-outputs.outputs.bucket }}"
-            echo "  BACKEND_TABLE  -> ${{ steps.set-outputs.outputs.table }}"
+            echo "Tabla DynamoDB ya existe: $TABLE"
           fi
-        env:
-          GH_TOKEN: ${{ secrets.PA_TOKEN }}
+
+          # Crear secrets automáticos con PAT si existe
+          if [ -n "${{ secrets.PA_TOKEN }}" ]; then
+            gh secret set BACKEND_BUCKET --body "$BUCKET"
+            gh secret set BACKEND_TABLE  --body "$TABLE"
+          else
+            echo "No se creó secret: falta PAT"
+            echo "BACKEND_BUCKET=$BUCKET"
+            echo "BACKEND_TABLE=$TABLE"
+          fi
