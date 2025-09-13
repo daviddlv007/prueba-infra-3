@@ -1,4 +1,5 @@
 name: Crear Backend
+
 on:
   workflow_dispatch:
 
@@ -59,12 +60,24 @@ jobs:
             echo "Tabla DynamoDB ya existe: $TABLE"
           fi
 
-          # Crear secrets automáticos con PAT si existe
+      - name: Crear secrets automáticos con PAT
+        run: |
+          set -euo pipefail
+
+          # Instalar GitHub CLI si no existe
+          if ! command -v gh >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y gh
+          fi
+
+          # Crear secrets solo si existe PA_TOKEN
           if [ -n "${{ secrets.PA_TOKEN }}" ]; then
+            export GH_TOKEN="${{ secrets.PA_TOKEN }}"
             gh secret set BACKEND_BUCKET --body "$BUCKET"
             gh secret set BACKEND_TABLE  --body "$TABLE"
+            echo "Secrets BACKEND_BUCKET y BACKEND_TABLE creados/actualizados."
           else
-            echo "No se creó secret: falta PAT"
+            echo "No se creó secret: falta PA_TOKEN"
             echo "BACKEND_BUCKET=$BUCKET"
             echo "BACKEND_TABLE=$TABLE"
           fi
