@@ -96,28 +96,26 @@ jobs:
           fi
 
 
-      - name: Verificar secrets creados
+      - name: Verificar valores de secrets
+        env:
+          GH_TOKEN: ${{ secrets.PA_TOKEN }}
         run: |
           set -euo pipefail
+          
+          # Obtener valores actuales de GitHub Secrets
+          GH_BUCKET=$(gh secret list --visibility=all | grep BACKEND_BUCKET >/dev/null && gh secret view BACKEND_BUCKET --repo $GITHUB_REPOSITORY --json name,value -q .value || echo "")
+          GH_TABLE=$(gh secret list --visibility=all | grep BACKEND_TABLE >/dev/null && gh secret view BACKEND_TABLE --repo $GITHUB_REPOSITORY --json name,value -q .value || echo "")
 
-          if [ -n "${{ secrets.PA_TOKEN }}" ]; then
-            echo "Verificando secret BACKEND_BUCKET..."
-            ACTUAL_BUCKET=$(GH_TOKEN="${{ secrets.PA_TOKEN }}" gh secret list --json name --jq '.[] | select(.name=="BACKEND_BUCKET") | .name' || echo "")
-            if [ "$ACTUAL_BUCKET" = "BACKEND_BUCKET" ]; then
-              echo "Secret BACKEND_BUCKET existe ✅"
-            else
-              echo "ERROR: Secret BACKEND_BUCKET no encontrado ❌"
-              exit 1
-            fi
-
-            echo "Verificando secret BACKEND_TABLE..."
-            ACTUAL_TABLE=$(GH_TOKEN="${{ secrets.PA_TOKEN }}" gh secret list --json name --jq '.[] | select(.name=="BACKEND_TABLE") | .name' || echo "")
-            if [ "$ACTUAL_TABLE" = "BACKEND_TABLE" ]; then
-              echo "Secret BACKEND_TABLE existe ✅"
-            else
-              echo "ERROR: Secret BACKEND_TABLE no encontrado ❌"
-              exit 1
-            fi
-          else
-            echo "No hay PAT definido, no se puede verificar."
+          # Comparar con los outputs del workflow
+          if [ "$GH_BUCKET" != "${{ steps.set-outputs.outputs.bucket }}" ]; then
+            echo "ERROR: BACKEND_BUCKET no coincide con el valor generado"
+            exit 1
           fi
+
+          if [ "$GH_TABLE" != "${{ steps.set-outputs.outputs.table }}" ]; then
+            echo "ERROR: BACKEND_TABLE no coincide con el valor generado"
+            exit 1
+          fi
+
+          echo "✅ Valores de secrets verificados correctamente"
+
