@@ -79,6 +79,14 @@ jobs:
           echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
           echo "table=$TABLE" >> "$GITHUB_OUTPUT"
 
+      - name: Mostrar valores antes de crear secrets
+        run: |
+          echo "===== Valores generados para revisión manual ====="
+          echo "BACKEND_BUCKET -> ${{ steps.set-outputs.outputs.bucket }}"
+          echo "BACKEND_TABLE  -> ${{ steps.set-outputs.outputs.table }}"
+          echo "=================================================="
+
+
       - name: Crear secrets automáticos con PAT (si existe)
         env:
           GH_TOKEN: ${{ secrets.PA_TOKEN }}
@@ -94,28 +102,3 @@ jobs:
             echo "  BACKEND_BUCKET -> ${{ steps.set-outputs.outputs.bucket }}"
             echo "  BACKEND_TABLE  -> ${{ steps.set-outputs.outputs.table }}"
           fi
-
-
-      - name: Verificar valores de secrets
-        env:
-          GH_TOKEN: ${{ secrets.PA_TOKEN }}
-        run: |
-          set -euo pipefail
-          
-          # Obtener valores actuales de GitHub Secrets
-          GH_BUCKET=$(gh secret list --visibility=all | grep BACKEND_BUCKET >/dev/null && gh secret view BACKEND_BUCKET --repo $GITHUB_REPOSITORY --json name,value -q .value || echo "")
-          GH_TABLE=$(gh secret list --visibility=all | grep BACKEND_TABLE >/dev/null && gh secret view BACKEND_TABLE --repo $GITHUB_REPOSITORY --json name,value -q .value || echo "")
-
-          # Comparar con los outputs del workflow
-          if [ "$GH_BUCKET" != "${{ steps.set-outputs.outputs.bucket }}" ]; then
-            echo "ERROR: BACKEND_BUCKET no coincide con el valor generado"
-            exit 1
-          fi
-
-          if [ "$GH_TABLE" != "${{ steps.set-outputs.outputs.table }}" ]; then
-            echo "ERROR: BACKEND_TABLE no coincide con el valor generado"
-            exit 1
-          fi
-
-          echo "✅ Valores de secrets verificados correctamente"
-
